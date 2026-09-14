@@ -31,10 +31,18 @@ data class AnalectsLibrary(
 data class AnalectsSource(
     val key: String = "",
     val name: String = "",
+    val shortName: String = "",
     val author: String = "",
     val publisher: String = "",
     val description: String = ""
-)
+) {
+    val displayName: String
+        get() {
+            if (shortName.isNotEmpty()) return shortName
+            val book = name.split("（").first().trim()
+            return if (author.isEmpty()) book else "$author《$book》"
+        }
+}
 
 @Serializable
 data class AnalectsStats(
@@ -55,6 +63,15 @@ data class Pian(
 )
 
 @Serializable
+data class RelatedQuestion(
+    val id: String = "",
+    val title: String = "",
+    val year: String = "",
+    val source: String = "",
+    val type: String = ""
+)
+
+@Serializable
 data class Chapter(
     val id: String,
     val number: Int,
@@ -62,7 +79,10 @@ data class Chapter(
     val text: String,
     val plainText: String,
     val translation: String = "",
-    val annotations: List<Annotation> = emptyList()
+    val annotations: List<Annotation> = emptyList(),
+    val comment: String = "",
+    val sourceReference: String = "",
+    val relatedQuestions: List<RelatedQuestion> = emptyList()
 )
 
 @Serializable
@@ -71,3 +91,4 @@ data class Annotation(
     val label: String,
     val text: String
 )
+

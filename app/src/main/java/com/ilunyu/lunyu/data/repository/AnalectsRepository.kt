@@ -45,22 +45,35 @@ class AnalectsRepository(private val context: Context) {
         return library.pians.find { it.slug == slug }
     }
 
-    suspend fun getChapter(pianSlug: String, chapterNumber: Int): Pair<Pian, Chapter>? {
-        val pian = getPianBySlug(pianSlug) ?: return null
-        val chapter = pian.chapters.find { it.number == chapterNumber } ?: return null
-        return pian to chapter
+    suspend fun getChapter(pianSlug: String, chapterNumber: Int): Pair<Pian, Chapter>? = withContext(Dispatchers.IO) {
+        val pian = getPianBySlug(pianSlug) ?: return@withContext null
+        val chapterSummary = pian.chapters.find { it.number == chapterNumber } ?: return@withContext null
+        try {
+            val detailPath = "content/editions/yangbojun-chapter-${chapterSummary.id}.json"
+            val detailContent = context.assets.open(detailPath).bufferedReader().use { it.readText() }
+            val detailedChapter = json.decodeFromString<Chapter>(detailContent)
+            pian to detailedChapter
+        } catch (_: Exception) {
+            pian to chapterSummary
+        }
     }
 
-    suspend fun getChapterById(chapterId: String): Pair<Pian, Chapter>? {
+    suspend fun getChapterById(chapterId: String): Pair<Pian, Chapter>? = withContext(Dispatchers.IO) {
         val library = getLibrary()
         for (pian in library.pians) {
-            for (chapter in pian.chapters) {
-                if (chapter.id == chapterId) {
-                    return pian to chapter
+            val chapterSummary = pian.chapters.find { it.id == chapterId }
+            if (chapterSummary != null) {
+                return@withContext try {
+                    val detailPath = "content/editions/yangbojun-chapter-${chapterSummary.id}.json"
+                    val detailContent = context.assets.open(detailPath).bufferedReader().use { it.readText() }
+                    val detailedChapter = json.decodeFromString<Chapter>(detailContent)
+                    pian to detailedChapter
+                } catch (_: Exception) {
+                    pian to chapterSummary
                 }
             }
         }
-        return null
+        null
     }
 
     suspend fun getAdjacentChapters(pianSlug: String, chapterNumber: Int): Pair<Pair<Pian, Chapter>?, Pair<Pian, Chapter>?> {

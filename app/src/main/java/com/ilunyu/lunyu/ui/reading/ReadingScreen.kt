@@ -1,6 +1,7 @@
 package com.ilunyu.lunyu.ui.reading
 
-import androidx.compose.foundation.clickable
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,28 +10,34 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.runtime.derivedStateOf
+import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTabLayout
+import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
+import com.ilunyu.lunyu.ui.common.LunyuTopBar
+import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +53,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReadingScreen(
     library: AnalectsLibrary?,
+    activePianSlug: String?,
+    onActivePianChanged: (String?) -> Unit,
     favoriteChapterIds: Set<String>,
     onToggleChapterFavorite: (String) -> Unit,
     onNavigateToChapter: (String, Int) -> Unit,
@@ -60,74 +69,135 @@ fun ReadingScreen(
     }
 
     val pians = library.pians
-    val pagerState = rememberPagerState(pageCount = { pians.size })
-    val coroutineScope = rememberCoroutineScope()
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
-    Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = library.source.name.ifBlank { "论语" },
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 20.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
+    // 拦截返回键：如果处于篇阅读，返回到篇目总览网格
+    BackHandler(enabled = activePianSlug != null) {
+        onActivePianChanged(null)
+    }
+
+    if (activePianSlug == null) {
+        // 1. 篇目总览网格视图（完全对齐 Flutter _CatalogPage）
+        val catalogGridState = rememberLazyGridState()
+        val isCatalogScrolledUnder by remember {
+            derivedStateOf {
+                catalogGridState.firstVisibleItemIndex > 0 || catalogGridState.firstVisibleItemScrollOffset > 0
+            }
+        }
+
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .statusBarsPadding()
+        ) {
+            LunyuTopBar(
+                showDivider = isCatalogScrolledUnder,
                 actions = {
                     IconButton(onClick = onNavigateToSearch) {
                         Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
                     }
                     Spacer(modifier = Modifier.width(4.dp))
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
-                )
+                }
             )
-        }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            ScrollableTabRow(
-                selectedTabIndex = pagerState.currentPage,
-                edgePadding = 24.dp,
-                divider = {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
             ) {
-                pians.forEachIndexed { index, pian ->
-                    Tab(
-                        selected = pagerState.currentPage == index,
-                        onClick = {
-                            coroutineScope.launch { pagerState.animateScrollToPage(index) }
-                        },
-                        text = { Text(pian.title) }
-                    )
-                }
+                PianCatalogGrid(
+                    pians = pians,
+                    gridState = catalogGridState,
+                    onSelectPian = { selected ->
+                        onActivePianChanged(selected.slug)
+                    }
+                )
             }
+        }
+    } else {
+        // 2. 篇阅读视图（完全对齐 Flutter PianReadingPage）
+        val initialIndex = pians.indexOfFirst { it.slug == activePianSlug }.coerceAtLeast(0)
+        val pagerState = rememberPagerState(
+            initialPage = initialIndex,
+            pageCount = { pians.size }
+        )
+        val coroutineScope = rememberCoroutineScope()
+        val readingScrollState = rememberLunyuTopBarScrollState()
 
+        // 同步 activePianSlug 变化与 pager
+        LaunchedEffect(activePianSlug) {
+            val idx = pians.indexOfFirst { it.slug == activePianSlug }
+            if (idx >= 0 && idx != pagerState.currentPage) {
+                pagerState.scrollToPage(idx)
+            }
+        }
+
+        // 同步 pager 滑动到 activePianSlug
+        LaunchedEffect(pagerState.currentPage) {
+            val slugAtPage = pians[pagerState.currentPage].slug
+            if (slugAtPage != activePianSlug) {
+                onActivePianChanged(slugAtPage)
+            }
+        }
+
+        LunyuCollapsibleTabLayout(
+            modifier = modifier,
+            scrollState = readingScrollState,
+            topBar = {
+                LunyuTopBar(
+                    title = {
+                        Text(
+                            text = library.source.displayName,
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 20.sp
+                            ),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = { onActivePianChanged(null) }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "返回篇目总览"
+                            )
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = onNavigateToSearch) {
+                            Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                )
+            },
+            tabBar = {
+                com.ilunyu.lunyu.ui.common.LunyuScrollableTabRow(
+                    pagerState = pagerState,
+                    tabs = pians.map { it.title },
+                    onTabSelected = { index ->
+                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                    }
+                )
+            }
+        ) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize()
             ) { page ->
                 val currentPian = pians[page]
+                val prevPian = if (page > 0) pians[page - 1] else null
+                val nextPian = if (page < pians.size - 1) pians[page + 1] else null
+
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
                     item {
                         Column(
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                            modifier = Modifier.padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                top = 20.dp,
+                                bottom = 20.dp
+                            )
                         ) {
                             Text(
                                 text = "共 ${currentPian.chapters.size} 章",
@@ -150,51 +220,32 @@ fun ReadingScreen(
                     }
 
                     itemsIndexed(currentPian.chapters) { index, chapter ->
-                        val isFavorite = favoriteChapterIds.contains(chapter.id)
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onNavigateToChapter(currentPian.slug, chapter.number) }
-                                .padding(horizontal = 24.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = "${currentPian.shortTitle} ${chapter.displayId}",
-                                    style = MaterialTheme.typography.titleMedium.copy(
-                                        fontWeight = FontWeight.Normal,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = chapter.plainText,
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            IconButton(onClick = { onToggleChapterFavorite(chapter.id) }) {
-                                Icon(
-                                    imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                                    contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                                    tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-                        if (index < currentPian.chapters.size - 1) {
-                            HorizontalDivider(
-                                modifier = Modifier.fillMaxWidth(),
-                                thickness = 1.dp,
-                                color = MaterialTheme.colorScheme.outlineVariant
-                            )
-                        }
+                        val isFav = favoriteChapterIds.contains(chapter.id)
+                        PianChapterRow(
+                            chapter = chapter,
+                            isFavorite = isFav,
+                            onToggleFavorite = { onToggleChapterFavorite(chapter.id) },
+                            onClick = { onNavigateToChapter(currentPian.slug, chapter.number) },
+                            showDivider = index < currentPian.chapters.size - 1
+                        )
                     }
 
-                    item { Spacer(modifier = Modifier.height(32.dp)) }
+                    item {
+                        PianSequenceNavigation(
+                            prevPian = prevPian,
+                            nextPian = nextPian,
+                            onNavigateToPian = { target ->
+                                val targetIdx = pians.indexOf(target)
+                                if (targetIdx >= 0) {
+                                    coroutineScope.launch {
+                                        pagerState.animateScrollToPage(targetIdx)
+                                    }
+                                }
+                            }
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(72.dp)) }
                 }
             }
         }

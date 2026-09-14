@@ -27,9 +27,11 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Exercise
@@ -41,6 +43,7 @@ import com.ilunyu.lunyu.ui.search.SearchScreen
 import com.ilunyu.lunyu.ui.settings.SettingsScreen
 import com.ilunyu.lunyu.ui.study.ExerciseDetailScreen
 import com.ilunyu.lunyu.ui.study.StudyScreen
+import kotlinx.coroutines.launch
 
 sealed interface ScreenDestination {
     data class Tab(val index: Int) : ScreenDestination
@@ -62,50 +65,85 @@ fun MainScreen(
     val exercises by viewModel.exercises.collectAsState()
 
     var selectedTab by remember { mutableIntStateOf(0) }
+    var activePianSlug by remember { mutableStateOf<String?>(null) }
     var currentDestination by remember { mutableStateOf<ScreenDestination>(ScreenDestination.Tab(0)) }
+    val coroutineScope = rememberCoroutineScope()
 
-    // Intercept hardware back button
+    // 硬件返回键处理
     BackHandler(enabled = currentDestination !is ScreenDestination.Tab) {
-        currentDestination = ScreenDestination.Tab(selectedTab)
+        when (currentDestination) {
+            is ScreenDestination.Search -> {
+                currentDestination = ScreenDestination.Tab(selectedTab)
+            }
+            is ScreenDestination.ChapterDetail -> {
+                // 返回阅读 Tab（保持在当前篇）
+                currentDestination = ScreenDestination.Tab(0)
+            }
+            is ScreenDestination.ExerciseDetail -> {
+                currentDestination = ScreenDestination.Tab(selectedTab)
+            }
+            else -> {
+                currentDestination = ScreenDestination.Tab(selectedTab)
+            }
+        }
     }
 
-    val isTopLevelTab = currentDestination is ScreenDestination.Tab
+    val showBottomBar = currentDestination !is ScreenDestination.Search
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.surface,
         bottomBar = {
-            if (isTopLevelTab) {
+            if (showBottomBar) {
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainer
+                    containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 0.dp
                 ) {
+                    // 1. 阅读
                     NavigationBarItem(
-                        selected = selectedTab == 0,
+                        selected = selectedTab == 0 && currentDestination !is ScreenDestination.ExerciseDetail,
                         onClick = {
+                            if (selectedTab == 0 && (activePianSlug != null || currentDestination is ScreenDestination.ChapterDetail)) {
+                                // 在阅读页再次点击阅读 Tab：重置回篇目总览网格（完全对齐 Flutter _openCatalogPage）
+                                activePianSlug = null
+                            }
                             selectedTab = 0
                             currentDestination = ScreenDestination.Tab(0)
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 0) Icons.AutoMirrored.Filled.MenuBook else Icons.AutoMirrored.Outlined.MenuBook,
+                                imageVector = if (selectedTab == 0 && currentDestination !is ScreenDestination.ExerciseDetail) {
+                                    Icons.AutoMirrored.Filled.MenuBook
+                                } else {
+                                    Icons.AutoMirrored.Outlined.MenuBook
+                                },
                                 contentDescription = "阅读"
                             )
                         },
                         label = { Text("阅读") }
                     )
+
+                    // 2. 学习
                     NavigationBarItem(
-                        selected = selectedTab == 1,
+                        selected = selectedTab == 1 && currentDestination !is ScreenDestination.ChapterDetail,
                         onClick = {
                             selectedTab = 1
                             currentDestination = ScreenDestination.Tab(1)
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 1) Icons.Default.School else Icons.Outlined.School,
+                                imageVector = if (selectedTab == 1 && currentDestination !is ScreenDestination.ChapterDetail) {
+                                    Icons.Default.School
+                                } else {
+                                    Icons.Outlined.School
+                                },
                                 contentDescription = "学习"
                             )
                         },
                         label = { Text("学习") }
                     )
+
+                    // 3. 收藏
                     NavigationBarItem(
                         selected = selectedTab == 2,
                         onClick = {
@@ -120,6 +158,8 @@ fun MainScreen(
                         },
                         label = { Text("收藏") }
                     )
+
+                    // 4. 设置（按要求：底栏“设置”图标保持不变，使用 Settings 图标）
                     NavigationBarItem(
                         selected = selectedTab == 3,
                         onClick = {
@@ -141,16 +181,19 @@ fun MainScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
+                .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
             when (val dest = currentDestination) {
                 is ScreenDestination.Tab -> {
                     when (dest.index) {
                         0 -> ReadingScreen(
                             library = library,
+                            activePianSlug = activePianSlug,
+                            onActivePianChanged = { activePianSlug = it },
                             favoriteChapterIds = favoriteChapters,
                             onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                             onNavigateToChapter = { slug, number ->
+                                activePianSlug = slug
                                 currentDestination = ScreenDestination.ChapterDetail(slug, number)
                             },
                             onNavigateToSearch = {
@@ -176,6 +219,7 @@ fun MainScreen(
                             onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                             onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                             onNavigateToChapter = { slug, number ->
+                                activePianSlug = slug
                                 currentDestination = ScreenDestination.ChapterDetail(slug, number)
                             },
                             onNavigateToExercise = { exerciseId ->
@@ -212,9 +256,15 @@ fun MainScreen(
                             isFavorite = favoriteChapters.contains(chapter.id),
                             onToggleFavorite = { viewModel.toggleChapterFavorite(chapter.id) },
                             onNavigateToChapter = { slug, number ->
+                                activePianSlug = slug
                                 currentDestination = ScreenDestination.ChapterDetail(slug, number)
                             },
-                            onBack = { currentDestination = ScreenDestination.Tab(selectedTab) }
+                            onNavigateToExercise = { exerciseId ->
+                                currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                            },
+                            onBack = {
+                                currentDestination = ScreenDestination.Tab(selectedTab)
+                            }
                         )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -232,7 +282,18 @@ fun MainScreen(
                             exercise = exercise,
                             isFavorite = favoriteExercises.contains(exercise.id),
                             onToggleFavorite = { viewModel.toggleExerciseFavorite(exercise.id) },
-                            onBack = { currentDestination = ScreenDestination.Tab(selectedTab) }
+                            onOpenChapterSourceId = { sourceId ->
+                                coroutineScope.launch {
+                                    val target = viewModel.getChapterById("$sourceId")
+                                    if (target != null) {
+                                        activePianSlug = target.first.slug
+                                        currentDestination = ScreenDestination.ChapterDetail(target.first.slug, target.second.number)
+                                    }
+                                }
+                            },
+                            onBack = {
+                                currentDestination = ScreenDestination.Tab(selectedTab)
+                            }
                         )
                     } else {
                         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -245,12 +306,15 @@ fun MainScreen(
                         library = library,
                         exercises = exercises,
                         onNavigateToChapter = { slug, number ->
+                            activePianSlug = slug
                             currentDestination = ScreenDestination.ChapterDetail(slug, number)
                         },
                         onNavigateToExercise = { exerciseId ->
                             currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
                         },
-                        onBack = { currentDestination = ScreenDestination.Tab(selectedTab) }
+                        onBack = {
+                            currentDestination = ScreenDestination.Tab(selectedTab)
+                        }
                     )
                 }
             }

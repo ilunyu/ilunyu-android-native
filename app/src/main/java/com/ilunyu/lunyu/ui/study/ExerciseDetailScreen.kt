@@ -1,7 +1,12 @@
 package com.ilunyu.lunyu.ui.study
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -9,21 +14,24 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.derivedStateOf
+import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -31,10 +39,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -42,163 +47,134 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.ExerciseBlock
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ExerciseDetailScreen(
     exercise: Exercise,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    onOpenChapterSourceId: ((Int) -> Unit)? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showAnswer by remember { mutableStateOf(false) }
-    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
-
-    Scaffold(
-        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = exercise.title,
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Medium,
-                            fontSize = 20.sp
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = onToggleFavorite) {
-                        Icon(
-                            imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                            contentDescription = if (isFavorite) "取消收藏" else "收藏",
-                            tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                },
-                scrollBehavior = scrollBehavior,
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    scrolledContainerColor = MaterialTheme.colorScheme.surface
-                )
-            )
+    val lazyListState = rememberLazyListState()
+    val isScrolledUnder by remember {
+        derivedStateOf {
+            lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
         }
-    ) { innerPadding ->
-        LazyColumn(
+    }
+
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .statusBarsPadding()
+    ) {
+        LunyuTopBar(
+            showDivider = isScrolledUnder,
+            navigationIcon = {
+                IconButton(onClick = onBack) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                        contentDescription = "返回试题库"
+                    )
+                }
+            },
+            actions = {
+                IconButton(onClick = onToggleFavorite) {
+                    Icon(
+                        imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                        contentDescription = if (isFavorite) "取消收藏" else "收藏试题",
+                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+        )
+
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
+                .fillMaxWidth()
+                .weight(1f)
         ) {
-            // 题目标签
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+            // 1. 标题与元数据（对齐 Flutter _ExerciseHeader）
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 16.dp)
+                        .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 20.dp)
                 ) {
                     Text(
                         text = exercise.title,
                         style = MaterialTheme.typography.headlineSmall.copy(
-                            fontWeight = FontWeight.Medium,
+                            fontSize = 24.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        if (exercise.year.isNotBlank()) {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(exercise.year, fontSize = 12.sp) },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                ),
-                                border = null
-                            )
+                        if (exercise.monthLabel.isNotBlank()) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Outlined.CalendarMonth,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = exercise.monthLabel,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
                         }
-                        if (exercise.source.isNotBlank()) {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(exercise.source, fontSize = 12.sp) },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                ),
-                                border = null
+
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Outlined.Assignment,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
-                        }
-                        if (exercise.type.isNotBlank()) {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(exercise.type, fontSize = 12.sp) },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                ),
-                                border = null
-                            )
-                        }
-                        if (exercise.score > 0) {
-                            AssistChip(
-                                onClick = {},
-                                label = { Text("${exercise.score} 分", fontSize = 12.sp) },
-                                colors = AssistChipDefaults.assistChipColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                ),
-                                border = null
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "第${exercise.number}题·满分${exercise.score}分",
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
                 }
             }
 
-            // 题目内容
-            item {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 24.dp)
-                ) {
-                    Text(
-                        text = "题目",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            color = MaterialTheme.colorScheme.primary,
-                            fontWeight = FontWeight.Normal
-                        )
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-            }
-
+            // 2. 题目各 Block（材料卡片 _MaterialCard、题干等）
             items(exercise.question) { block ->
-                ExerciseBlockView(block = block)
+                ExerciseBlockItem(
+                    block = block,
+                    onOpenChapterSourceId = onOpenChapterSourceId
+                )
             }
 
-            // 答案与解析切换按钮
+            // 3. 答案与解析展开按钮
             item {
                 Column(
                     modifier = Modifier
@@ -225,7 +201,7 @@ fun ExerciseDetailScreen(
                 }
             }
 
-            // 答案内容
+            // 4. 答案与解析内容
             if (showAnswer) {
                 item {
                     Column(
@@ -235,9 +211,10 @@ fun ExerciseDetailScreen(
                     ) {
                         Text(
                             text = "答案与解析",
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                color = MaterialTheme.colorScheme.tertiary,
-                                fontWeight = FontWeight.Normal
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.tertiary
                             )
                         )
                         Spacer(modifier = Modifier.height(12.dp))
@@ -245,7 +222,10 @@ fun ExerciseDetailScreen(
                 }
 
                 items(exercise.answer) { block ->
-                    ExerciseBlockView(block = block)
+                    ExerciseBlockItem(
+                        block = block,
+                        onOpenChapterSourceId = onOpenChapterSourceId
+                    )
                 }
             }
 
@@ -253,73 +233,140 @@ fun ExerciseDetailScreen(
         }
     }
 }
+}
+
 
 @Composable
-private fun ExerciseBlockView(block: ExerciseBlock) {
-    when (block.type) {
-        "material" -> {
-            Card(
+private fun ExerciseBlockItem(
+    block: ExerciseBlock,
+    onOpenChapterSourceId: ((Int) -> Unit)?
+) {
+    if (block.isMaterial) {
+        // 材料卡片（完全对齐 Flutter _MaterialCard）
+        val tappable = block.sourceid != null && block.sourceid > 0 && onOpenChapterSourceId != null
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .then(
+                    if (tappable) {
+                        Modifier.clickable { onOpenChapterSourceId?.invoke(block.sourceid!!) }
+                    } else Modifier
+                ),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 8.dp),
-                shape = RoundedCornerShape(12.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    .padding(horizontal = 16.dp, vertical = 14.dp)
             ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    if (block.text.isNotBlank()) {
+                if (block.blocktitle.isNotBlank()) {
+                    Text(
+                        text = block.blocktitle,
+                        style = MaterialTheme.typography.titleSmall.copy(
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                if (block.paragraphs.isNotEmpty()) {
+                    block.paragraphs.forEachIndexed { idx, p ->
+                        if (idx > 0) Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = block.text,
+                            text = p.text,
                             style = MaterialTheme.typography.bodyMedium.copy(
+                                fontSize = 15.sp,
                                 lineHeight = 26.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
                     }
-                    block.paragraphs.forEach { paragraph ->
-                        Text(
-                            text = paragraph.text,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                lineHeight = 26.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            ),
-                            modifier = Modifier.padding(vertical = 4.dp)
+                } else if (block.text.isNotBlank()) {
+                    Text(
+                        text = block.text,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 26.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
+                    )
+                }
+
+                if (block.sourcename.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = block.sourcename,
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = if (tappable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        )
+                        if (tappable) {
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                contentDescription = "查看原章",
+                                modifier = Modifier.size(16.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
                     }
                 }
             }
         }
-        else -> {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 6.dp)
-            ) {
-                if (block.text.isNotBlank()) {
+    } else {
+        // 普通题干或小问说明
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp, vertical = 8.dp)
+        ) {
+            if (block.blocktitle.isNotBlank()) {
+                Text(
+                    text = block.blocktitle,
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+            }
+
+            if (block.paragraphs.isNotEmpty()) {
+                block.paragraphs.forEachIndexed { idx, p ->
+                    if (idx > 0) Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = block.text,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            lineHeight = 30.sp,
+                        text = p.text,
+                        style = MaterialTheme.typography.bodyMedium.copy(
+                            fontSize = 15.sp,
+                            lineHeight = 26.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
                 }
-                block.paragraphs.forEach { paragraph ->
-                    Text(
-                        text = paragraph.text,
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            lineHeight = 30.sp,
-                            color = MaterialTheme.colorScheme.onSurface
-                        ),
-                        modifier = Modifier.padding(vertical = 4.dp)
+            } else if (block.text.isNotBlank()) {
+                Text(
+                    text = block.text,
+                    style = MaterialTheme.typography.bodyMedium.copy(
+                        fontSize = 15.sp,
+                        lineHeight = 26.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                }
+                )
             }
         }
     }

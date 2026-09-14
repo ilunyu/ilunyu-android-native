@@ -79,6 +79,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return analectsRepo.getChapter(pianSlug, chapterNumber)
     }
 
+    suspend fun getChapterById(chapterId: String): Pair<Pian, Chapter>? {
+        return analectsRepo.getChapterById(chapterId)
+    }
+
     suspend fun getAdjacentChapters(pianSlug: String, chapterNumber: Int): Pair<Pair<Pian, Chapter>?, Pair<Pian, Chapter>?> {
         return analectsRepo.getAdjacentChapters(pianSlug, chapterNumber)
     }
@@ -87,3 +91,4 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         return exerciseRepo.getExerciseDetail(id)
     }
 }
+
