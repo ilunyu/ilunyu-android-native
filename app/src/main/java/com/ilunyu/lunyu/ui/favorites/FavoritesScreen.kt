@@ -21,6 +21,7 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
@@ -28,7 +29,6 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Sort
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.AssistChipDefaults
@@ -173,7 +173,7 @@ fun FavoritesScreen(
                         ) {
                             Icon(
                                 imageVector = when (sortMode) {
-                                    FavoritesSortMode.DEFAULT -> Icons.Default.Sort
+                                    FavoritesSortMode.DEFAULT -> Icons.AutoMirrored.Filled.Sort
                                     FavoritesSortMode.NEWEST_FIRST -> Icons.Default.ArrowDownward
                                     FavoritesSortMode.OLDEST_FIRST -> Icons.Default.ArrowUpward
                                 },
