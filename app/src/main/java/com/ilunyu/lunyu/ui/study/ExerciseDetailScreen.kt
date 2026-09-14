@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -26,25 +27,19 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CalendarMonth
-import androidx.compose.material.icons.outlined.Visibility
-import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +58,6 @@ fun ExerciseDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showAnswer by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState()
     val isScrolledUnder by remember {
         derivedStateOf {
@@ -174,59 +168,31 @@ fun ExerciseDetailScreen(
                 )
             }
 
-            // 3. 答案与解析展开按钮
+
+            // 3. 答案与解析标题 (对齐 Flutter 规范直接陈列)
             item {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp)
+                        .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 10.dp)
                 ) {
-                    HorizontalDivider(
-                        thickness = 1.dp,
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
-                    OutlinedButton(
-                        onClick = { showAnswer = !showAnswer },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = if (showAnswer) Icons.Outlined.VisibilityOff else Icons.Outlined.Visibility,
-                            contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                    Text(
+                        text = "答案与解析",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = if (showAnswer) "收起答案与解析" else "查看答案与解析")
-                    }
+                    )
                 }
             }
 
             // 4. 答案与解析内容
-            if (showAnswer) {
-                item {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                    ) {
-                        Text(
-                            text = "答案与解析",
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.tertiary
-                            )
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                    }
-                }
-
-                items(exercise.answer) { block ->
-                    ExerciseBlockItem(
-                        block = block,
-                        onOpenChapterSourceId = onOpenChapterSourceId
-                    )
-                }
+            items(exercise.answer) { block ->
+                ExerciseBlockItem(
+                    block = block,
+                    onOpenChapterSourceId = onOpenChapterSourceId
+                )
             }
 
             item { Spacer(modifier = Modifier.height(48.dp)) }
@@ -234,6 +200,7 @@ fun ExerciseDetailScreen(
     }
 }
 }
+
 
 
 @Composable
@@ -244,21 +211,15 @@ private fun ExerciseBlockItem(
     if (block.isMaterial) {
         // 材料卡片（完全对齐 Flutter _MaterialCard）
         val tappable = block.sourceid != null && block.sourceid > 0 && onOpenChapterSourceId != null
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
-                .then(
-                    if (tappable) {
-                        Modifier.clickable { onOpenChapterSourceId?.invoke(block.sourceid!!) }
-                    } else Modifier
-                ),
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
+        val cardShape = RoundedCornerShape(16.dp)
+        val cardColors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
+        )
+        val cardModifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 24.dp, vertical = 8.dp)
+
+        val cardContent = @Composable {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -325,6 +286,27 @@ private fun ExerciseBlockItem(
                         }
                     }
                 }
+            }
+        }
+
+        if (tappable) {
+            Card(
+                onClick = { onOpenChapterSourceId?.invoke(block.sourceid!!) },
+                modifier = cardModifier.clip(cardShape),
+                shape = cardShape,
+                colors = cardColors,
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                cardContent()
+            }
+        } else {
+            Card(
+                modifier = cardModifier,
+                shape = cardShape,
+                colors = cardColors,
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                cardContent()
             }
         }
     } else {

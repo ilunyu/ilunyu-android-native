@@ -31,8 +31,11 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Quiz
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.draw.clip
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
@@ -43,6 +46,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,6 +68,7 @@ import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -80,7 +85,9 @@ fun ChapterScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
+    var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
 
     LaunchedEffect(isCopied) {
         if (isCopied) {
@@ -161,7 +168,16 @@ fun ChapterScreen(
                     val originalAnnotated = formatChapterOriginalText(
                         displayId = chapter.displayId,
                         rawText = rawOrPlain,
-                        primaryColor = MaterialTheme.colorScheme.primary
+                        primaryColor = MaterialTheme.colorScheme.primary,
+                        onAnnotationClick = { noteNum ->
+                            highlightedAnnotationIndex = noteNum
+                            val noteIdx = chapter.annotations.indexOfFirst { it.index == noteNum }
+                            if (noteIdx >= 0) {
+                                coroutineScope.launch {
+                                    lazyListState.animateScrollToItem(3 + noteIdx)
+                                }
+                            }
+                        }
                     )
                     Text(
                         text = originalAnnotated,
@@ -227,63 +243,82 @@ fun ChapterScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         )
-                    } else {
-                        chapter.annotations.forEachIndexed { idx, note ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(bottom = if (idx == chapter.annotations.size - 1) 0.dp else 20.dp),
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                // 圆形序号徽标
-                                Box(
-                                    modifier = Modifier
-                                        .size(24.dp)
-                                        .background(
-                                            color = MaterialTheme.colorScheme.primaryContainer,
-                                            shape = CircleShape
-                                        ),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "${note.index}",
-                                        style = MaterialTheme.typography.labelSmall.copy(
-                                            fontSize = 12.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                                        )
-                                    )
+                        Spacer(modifier = Modifier.height(48.dp))
+                    }
+                }
+            }
+
+            if (chapter.annotations.isNotEmpty()) {
+                itemsIndexed(chapter.annotations, key = { _, note -> "note_${note.index}" }) { idx, note ->
+                    val isHighlighted = highlightedAnnotationIndex == note.index
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                bottom = if (idx == chapter.annotations.size - 1) 48.dp else 20.dp
+                            ),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        // 圆形序号徽标：点击返回原文，高亮时显式突出，水波纹严格呈圆形
+                        Surface(
+                            onClick = {
+                                highlightedAnnotationIndex = note.index
+                                coroutineScope.launch {
+                                    lazyListState.animateScrollToItem(0)
                                 }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                val noteAnnotated = buildAnnotatedString {
-                                    if (note.label.isNotBlank()) {
-                                        withStyle(
-                                            SpanStyle(
-                                                fontWeight = FontWeight.Bold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        ) {
-                                            append("${note.label}　")
-                                        }
-                                    }
-                                    append(note.text)
-                                }
-
+                            },
+                            shape = CircleShape,
+                            color = if (isHighlighted) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.secondaryContainer
+                            },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Text(
-                                    text = noteAnnotated,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontSize = 16.sp,
-                                        lineHeight = 28.sp,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.weight(1f)
+                                    text = "${note.index}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = if (isHighlighted) {
+                                            MaterialTheme.colorScheme.onPrimary
+                                        } else {
+                                            MaterialTheme.colorScheme.onSecondaryContainer
+                                        }
+                                    )
                                 )
                             }
                         }
+
+                        Spacer(modifier = Modifier.width(12.dp))
+
+                        val noteAnnotated = buildAnnotatedString {
+                            if (note.label.isNotBlank()) {
+                                withStyle(
+                                    SpanStyle(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                ) {
+                                    append("${note.label}　")
+                                }
+                            }
+                            append(note.text)
+                        }
+
+                        Text(
+                            text = noteAnnotated,
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                fontSize = 16.sp,
+                                lineHeight = 28.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier.weight(1f)
+                        )
                     }
-                    Spacer(modifier = Modifier.height(48.dp))
                 }
             }
 
@@ -314,10 +349,11 @@ fun ChapterScreen(
                     } else {
                         chapter.relatedQuestions.forEach { q ->
                             Card(
+                                onClick = { onNavigateToExercise(q.id) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 4.dp)
-                                    .clickable { onNavigateToExercise(q.id) },
+                                    .clip(RoundedCornerShape(12.dp)),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow

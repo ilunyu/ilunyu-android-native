@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
@@ -356,10 +357,11 @@ private fun ThemeOptionCard(
     }
 
     Card(
+        onClick = onClick,
         modifier = modifier
             .height(68.dp)
-            .clickable(onClick = onClick),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            .clip(RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
@@ -417,10 +419,11 @@ private fun FontOptionCard(
     }
 
     Card(
+        onClick = onClick,
         modifier = modifier
             .height(68.dp)
-            .clickable(onClick = onClick),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+            .clip(RoundedCornerShape(12.dp)),
+        shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = containerColor),
         elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {

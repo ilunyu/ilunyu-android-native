@@ -41,9 +41,14 @@ import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
 
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.TextLinkStyles
+
 /**
  * 篇目总览卡片：双列网格中的单个篇目卡片。
  * 背景为 surfaceContainerLow，圆角 16dp，高度 80dp。
+ * 点击水波纹严格限制在 16dp 圆角范围内。
  */
 @Composable
 fun PianCatalogCard(
@@ -53,10 +58,11 @@ fun PianCatalogCard(
     highlightTerms: List<String> = emptyList()
 ) {
     Card(
+        onClick = onClick,
         modifier = modifier
             .fillMaxWidth()
             .height(80.dp)
-            .clickable(onClick = onClick),
+            .clip(RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow
@@ -132,11 +138,13 @@ fun PianCatalogGrid(
  * 格式化章节原文：
  * 1. 在段首插入大号章节号（例如 "4·1 "），颜色为 primary。
  * 2. 将文本中类似 "[1]", "[2]" 的注释标记替换为带圈数字 ①, ②, ③...，颜色为 primary。
+ * 3. 支持点击带圈数字跳转到注释。
  */
 fun formatChapterOriginalText(
     displayId: String,
     rawText: String,
-    primaryColor: androidx.compose.ui.graphics.Color
+    primaryColor: androidx.compose.ui.graphics.Color,
+    onAnnotationClick: ((Int) -> Unit)? = null
 ): AnnotatedString {
     return buildAnnotatedString {
         // 章节编号
@@ -158,9 +166,24 @@ fun formatChapterOriginalText(
             } else {
                 "[$num]"
             }
-            pushStyle(SpanStyle(color = primaryColor, fontWeight = FontWeight.Normal))
-            append(circled)
-            pop()
+            if (onAnnotationClick != null) {
+                val link = LinkAnnotation.Clickable(
+                    tag = "annotation_$num",
+                    styles = TextLinkStyles(
+                        style = SpanStyle(color = primaryColor, fontWeight = FontWeight.Bold)
+                    ),
+                    linkInteractionListener = {
+                        onAnnotationClick(num)
+                    }
+                )
+                pushLink(link)
+                append(circled)
+                pop()
+            } else {
+                pushStyle(SpanStyle(color = primaryColor, fontWeight = FontWeight.Normal))
+                append(circled)
+                pop()
+            }
             cursor = match.range.last + 1
         }
         if (cursor < rawText.length) {
