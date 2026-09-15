@@ -54,6 +54,7 @@ import com.ilunyu.lunyu.ui.study.ExerciseListRow
 fun SearchScreen(
     library: AnalectsLibrary?,
     exercises: List<Exercise>,
+    initialTab: Int = 0,
     favoriteChapterIds: Set<String> = emptySet(),
     favoriteExerciseIds: Set<String> = emptySet(),
     onToggleChapterFavorite: (String) -> Unit = {},
@@ -64,7 +65,7 @@ fun SearchScreen(
     modifier: Modifier = Modifier
 ) {
     var query by remember { mutableStateOf("") }
-    var selectedTab by remember { mutableIntStateOf(0) }
+    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
@@ -74,39 +75,52 @@ fun SearchScreen(
     }
 
     val queryTrimmed = query.trim()
-    val highlightTerms = remember(queryTrimmed) {
-        if (queryTrimmed.isBlank()) emptyList() else listOf(queryTrimmed)
+    val terms = remember(queryTrimmed) {
+        if (queryTrimmed.isBlank()) emptyList()
+        else queryTrimmed.split(Regex("\\s+")).filter { it.isNotEmpty() }
     }
+    val highlightTerms = terms
 
-    val matchingChapters = remember(queryTrimmed, library) {
-        if (queryTrimmed.isBlank() || library == null) emptyList()
+    val matchingChapters = remember(terms, library) {
+        if (terms.isEmpty() || library == null) emptyList()
         else {
             val list = mutableListOf<Pair<Pian, Chapter>>()
             for (pian in library.pians) {
+                val normalizedPianTitle = pian.title.lowercase()
+                val normalizedPianShort = pian.shortTitle.lowercase()
                 for (chapter in pian.chapters) {
-                    if (chapter.plainText.contains(queryTrimmed, ignoreCase = true) ||
-                        chapter.text.contains(queryTrimmed, ignoreCase = true) ||
-                        chapter.translation.contains(queryTrimmed, ignoreCase = true) ||
-                        chapter.displayId.contains(queryTrimmed, ignoreCase = true) ||
-                        pian.title.contains(queryTrimmed, ignoreCase = true)
-                    ) {
+                    val searchable = "${chapter.plainText}\n${chapter.text}\n${chapter.translation}\n${chapter.displayId}\n${chapter.id}\n${pian.title}\n${pian.shortTitle}"
+                    val matches = terms.all { term ->
+                        val termLower = term.lowercase()
+                        val normPian = normalizePianTerm(termLower)
+                        searchable.contains(termLower, ignoreCase = true) ||
+                            (normPian.isNotEmpty() && (normalizedPianShort.contains(normPian) || normalizedPianTitle.contains(normPian)))
+                    }
+                    if (matches) {
                         list.add(pian to chapter)
                     }
                 }
             }
+            list.sortBy { (_, chapter) -> chapter.id.toIntOrNull() ?: Int.MAX_VALUE }
             list
         }
     }
 
-    val matchingExercises = remember(queryTrimmed, exercises) {
-        if (queryTrimmed.isBlank()) emptyList()
+    val matchingExercises = remember(terms, exercises) {
+        if (terms.isEmpty()) emptyList()
         else {
-            exercises.filter {
-                it.title.contains(queryTrimmed, ignoreCase = true) ||
-                it.source.contains(queryTrimmed, ignoreCase = true) ||
-                it.year.contains(queryTrimmed, ignoreCase = true) ||
-                it.type.contains(queryTrimmed, ignoreCase = true)
-            }
+            exercises
+                .filter { exercise ->
+                    val searchable = exercise.toSearchableText()
+                    terms.all { term ->
+                        searchable.contains(term, ignoreCase = true)
+                    }
+                }
+                .sortedWith(
+                    compareBy<Exercise> { if (it.type == "真题") 0 else 1 }
+                        .thenByDescending { it.month }
+                        .thenBy { it.id }
+                )
         }
     }
 
@@ -253,4 +267,36 @@ fun SearchScreen(
             }
         }
     }
+}
+
+private fun normalizePianTerm(term: String): String {
+    return term
+        .replace(Regex("篇?第[〇零一二三四五六七八九十百千万两0-9]+"), "")
+        .replace("篇", "")
+        .replace("第", "")
+}
+
+private fun Exercise.toSearchableText(): String {
+    val sb = StringBuilder(512)
+    sb.append(title).append('\n')
+    sb.append(source).append('\n')
+    sb.append(year).append('\n')
+    sb.append(type).append('\n')
+    for (block in question) {
+        if (block.text.isNotEmpty()) {
+            sb.append(block.text).append('\n')
+        }
+        if (block.blocktitle.isNotEmpty()) {
+            sb.append(block.blocktitle).append('\n')
+        }
+        if (block.sourcename.isNotEmpty()) {
+            sb.append(block.sourcename).append('\n')
+        }
+        for (paragraph in block.paragraphs) {
+            if (paragraph.text.isNotEmpty()) {
+                sb.append(paragraph.text).append('\n')
+            }
+        }
+    }
+    return sb.toString()
 }

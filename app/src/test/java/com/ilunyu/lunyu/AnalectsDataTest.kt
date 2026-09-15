@@ -71,4 +71,46 @@ class AnalectsDataTest {
         assertEquals(AppFontPreference.SERIF, AppFontPreference.fromKey("serif"))
         assertEquals(AppFontPreference.SYSTEM, AppFontPreference.fromKey("system"))
     }
+
+    @Test
+    fun testExerciseSearchJsonParsingAndSearch() {
+        val file = File("src/main/assets/content/exercises/search.json")
+        assertTrue("exercises/search.json must exist", file.exists())
+
+        val content = file.readText()
+        val index = json.decodeFromString<ExerciseIndex>(content)
+        assertTrue("search exercises size should be > 70", index.exercises.size >= 70)
+
+        // Verify that question content actually exists
+        val firstEx = index.exercises.first { it.id == "201506-bjgk" }
+        assertTrue("first exercise must have questions", firstEx.question.isNotEmpty())
+        val firstMaterial = firstEx.question.firstOrNull { it.isMaterial }
+        assertNotNull("first exercise must have material", firstMaterial)
+        assertTrue(firstMaterial!!.paragraphs.any { it.text.contains("侍坐") || it.text.contains("夫子何哂由也") })
+
+        // Test searching for classical quotes: "侍坐", "富与贵", "温故而知新"
+        val queryShizuo = "侍坐"
+        val matchesShizuo = index.exercises.filter { ex ->
+            val sb = StringBuilder()
+            sb.append(ex.title).append('\n').append(ex.source).append('\n')
+            for (b in ex.question) {
+                sb.append(b.text).append('\n').append(b.blocktitle).append('\n').append(b.sourcename).append('\n')
+                for (p in b.paragraphs) sb.append(p.text).append('\n')
+            }
+            sb.toString().contains(queryShizuo)
+        }
+        assertTrue("Searching '侍坐' must find matching exercises", matchesShizuo.isNotEmpty())
+
+        val queryFuyugui = "富与贵"
+        val matchesFuyugui = index.exercises.filter { ex ->
+            val sb = StringBuilder()
+            sb.append(ex.title).append('\n').append(ex.source).append('\n')
+            for (b in ex.question) {
+                sb.append(b.text).append('\n').append(b.blocktitle).append('\n').append(b.sourcename).append('\n')
+                for (p in b.paragraphs) sb.append(p.text).append('\n')
+            }
+            sb.toString().contains(queryFuyugui)
+        }
+        assertTrue("Searching '富与贵' must find matching exercises", matchesFuyugui.isNotEmpty())
+    }
 }

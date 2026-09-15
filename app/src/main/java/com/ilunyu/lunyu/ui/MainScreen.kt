@@ -60,7 +60,7 @@ sealed interface ScreenDestination {
     data class Tab(val index: Int) : ScreenDestination
     data class ChapterDetail(val pianSlug: String, val chapterNumber: Int) : ScreenDestination
     data class ExerciseDetail(val exerciseId: String) : ScreenDestination
-    data object Search : ScreenDestination
+    data class Search(val initialTab: Int = 0) : ScreenDestination
 }
 
 @Composable
@@ -319,7 +319,7 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToSearch = {
-                                    navigateTo(ScreenDestination.Search)
+                                    navigateTo(ScreenDestination.Search(0))
                                 }
                             )
                             1 -> StudyScreen(
@@ -330,7 +330,7 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
-                                    navigateTo(ScreenDestination.Search)
+                                    navigateTo(ScreenDestination.Search(1))
                                 }
                             )
                             2 -> FavoritesScreen(
@@ -348,7 +348,7 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
-                                    navigateTo(ScreenDestination.Search)
+                                    navigateTo(ScreenDestination.Search(0))
                                 }
                             )
                             3 -> SettingsScreen(
@@ -427,9 +427,15 @@ fun MainScreen(
                         }
                     }
                     is ScreenDestination.Search -> {
+                        val searchExercises by viewModel.searchExercises.collectAsState()
                         SearchScreen(
                             library = library,
-                            exercises = exercises,
+                            exercises = searchExercises,
+                            initialTab = dest.initialTab,
+                            favoriteChapterIds = favoriteChapters,
+                            favoriteExerciseIds = favoriteExercises,
+                            onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
+                            onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                             onNavigateToChapter = { slug, number ->
                                 activePianSlug = slug
                                 navigateTo(ScreenDestination.ChapterDetail(slug, number))

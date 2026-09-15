@@ -15,6 +15,7 @@ class ExerciseRepository(private val context: Context) {
     }
 
     private var cachedList: List<Exercise>? = null
+    private var cachedSearchList: List<Exercise>? = null
     private val detailedExerciseCache = java.util.concurrent.ConcurrentHashMap<String, Exercise>()
 
     suspend fun getExerciseList(): List<Exercise> = withContext(Dispatchers.IO) {
@@ -23,6 +24,18 @@ class ExerciseRepository(private val context: Context) {
         val index = json.decodeFromString<ExerciseIndex>(content)
         cachedList = index.exercises
         index.exercises
+    }
+
+    suspend fun getSearchExercises(): List<Exercise> = withContext(Dispatchers.IO) {
+        cachedSearchList?.let { return@withContext it }
+        try {
+            val content = context.assets.open("content/exercises/search.json").bufferedReader().use { it.readText() }
+            val index = json.decodeFromString<ExerciseIndex>(content)
+            cachedSearchList = index.exercises
+            index.exercises
+        } catch (_: Exception) {
+            getExerciseList()
+        }
     }
 
     suspend fun getExerciseDetail(id: String): Exercise? = withContext(Dispatchers.IO) {

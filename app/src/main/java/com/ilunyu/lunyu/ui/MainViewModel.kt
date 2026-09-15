@@ -45,12 +45,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises.asStateFlow()
 
+    private val _searchExercises = MutableStateFlow<List<Exercise>>(emptyList())
+    val searchExercises: StateFlow<List<Exercise>> = _searchExercises.asStateFlow()
+
     init {
         viewModelScope.launch {
             _library.value = analectsRepo.getLibrary()
         }
         viewModelScope.launch {
             _exercises.value = exerciseRepo.getExerciseList()
+        }
+        viewModelScope.launch {
+            _searchExercises.value = exerciseRepo.getSearchExercises()
         }
     }
 
