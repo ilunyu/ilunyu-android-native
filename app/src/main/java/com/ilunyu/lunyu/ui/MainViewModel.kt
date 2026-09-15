@@ -48,6 +48,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchExercises = MutableStateFlow<List<Exercise>>(emptyList())
     val searchExercises: StateFlow<List<Exercise>> = _searchExercises.asStateFlow()
 
+    private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+
+    private val _searchTab = MutableStateFlow(0)
+    val searchTab: StateFlow<Int> = _searchTab.asStateFlow()
+
+    private val _chapterScrollIndex = MutableStateFlow(0)
+    val chapterScrollIndex: StateFlow<Int> = _chapterScrollIndex.asStateFlow()
+    private val _chapterScrollOffset = MutableStateFlow(0)
+    val chapterScrollOffset: StateFlow<Int> = _chapterScrollOffset.asStateFlow()
+
+    private val _exerciseScrollIndex = MutableStateFlow(0)
+    val exerciseScrollIndex: StateFlow<Int> = _exerciseScrollIndex.asStateFlow()
+    private val _exerciseScrollOffset = MutableStateFlow(0)
+    val exerciseScrollOffset: StateFlow<Int> = _exerciseScrollOffset.asStateFlow()
+
     init {
         viewModelScope.launch {
             _library.value = analectsRepo.getLibrary()
@@ -104,6 +120,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     suspend fun getExerciseDetail(id: String): Exercise? {
         return exerciseRepo.getExerciseDetail(id)
+    }
+
+    fun setSearchQuery(query: String) {
+        _searchQuery.value = query
+    }
+
+    fun setSearchTab(tab: Int) {
+        _searchTab.value = tab
+    }
+
+    fun saveSearchScroll(isExercise: Boolean, index: Int, offset: Int) {
+        if (isExercise) {
+            _exerciseScrollIndex.value = index
+            _exerciseScrollOffset.value = offset
+        } else {
+            _chapterScrollIndex.value = index
+            _chapterScrollOffset.value = offset
+        }
+    }
+
+    fun clearSearch() {
+        _searchQuery.value = ""
+        _chapterScrollIndex.value = 0
+        _chapterScrollOffset.value = 0
+        _exerciseScrollIndex.value = 0
+        _exerciseScrollOffset.value = 0
     }
 }
 

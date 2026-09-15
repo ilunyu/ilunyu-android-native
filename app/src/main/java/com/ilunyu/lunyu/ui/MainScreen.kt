@@ -108,6 +108,9 @@ fun MainScreen(
 
     // 硬件返回键处理
     BackHandler(enabled = destinationStack.size > 1) {
+        if (destinationStack.lastOrNull() is ScreenDestination.Search) {
+            viewModel.clearSearch()
+        }
         navigateBack()
     }
 
@@ -319,6 +322,8 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToSearch = {
+                                    viewModel.clearSearch()
+                                    viewModel.setSearchTab(0)
                                     navigateTo(ScreenDestination.Search(0))
                                 }
                             )
@@ -330,6 +335,8 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
+                                    viewModel.clearSearch()
+                                    viewModel.setSearchTab(1)
                                     navigateTo(ScreenDestination.Search(1))
                                 }
                             )
@@ -348,6 +355,8 @@ fun MainScreen(
                                     navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
+                                    viewModel.clearSearch()
+                                    viewModel.setSearchTab(0)
                                     navigateTo(ScreenDestination.Search(0))
                                 }
                             )
@@ -428,10 +437,27 @@ fun MainScreen(
                     }
                     is ScreenDestination.Search -> {
                         val searchExercises by viewModel.searchExercises.collectAsState()
+                        val searchQuery by viewModel.searchQuery.collectAsState()
+                        val searchTab by viewModel.searchTab.collectAsState()
+                        val chapterScrollIndex by viewModel.chapterScrollIndex.collectAsState()
+                        val chapterScrollOffset by viewModel.chapterScrollOffset.collectAsState()
+                        val exerciseScrollIndex by viewModel.exerciseScrollIndex.collectAsState()
+                        val exerciseScrollOffset by viewModel.exerciseScrollOffset.collectAsState()
+
                         SearchScreen(
                             library = library,
                             exercises = searchExercises,
-                            initialTab = dest.initialTab,
+                            query = searchQuery,
+                            onQueryChange = { viewModel.setSearchQuery(it) },
+                            searchTab = searchTab,
+                            onTabChange = { viewModel.setSearchTab(it) },
+                            chapterScrollIndex = chapterScrollIndex,
+                            chapterScrollOffset = chapterScrollOffset,
+                            exerciseScrollIndex = exerciseScrollIndex,
+                            exerciseScrollOffset = exerciseScrollOffset,
+                            onSaveScroll = { isExercise, index, offset ->
+                                viewModel.saveSearchScroll(isExercise, index, offset)
+                            },
                             favoriteChapterIds = favoriteChapters,
                             favoriteExerciseIds = favoriteExercises,
                             onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
@@ -444,6 +470,7 @@ fun MainScreen(
                                 navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                             },
                             onBack = {
+                                viewModel.clearSearch()
                                 navigateBack()
                             }
                         )

@@ -5,11 +5,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,9 +30,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,9 +40,11 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 import com.ilunyu.lunyu.data.model.AnalectsLibrary
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Exercise
@@ -54,7 +59,15 @@ import com.ilunyu.lunyu.ui.study.ExerciseListRow
 fun SearchScreen(
     library: AnalectsLibrary?,
     exercises: List<Exercise>,
-    initialTab: Int = 0,
+    query: String,
+    onQueryChange: (String) -> Unit,
+    searchTab: Int = 0,
+    onTabChange: (Int) -> Unit = {},
+    chapterScrollIndex: Int = 0,
+    chapterScrollOffset: Int = 0,
+    exerciseScrollIndex: Int = 0,
+    exerciseScrollOffset: Int = 0,
+    onSaveScroll: (isExercise: Boolean, index: Int, offset: Int) -> Unit = { _, _, _ -> },
     favoriteChapterIds: Set<String> = emptySet(),
     favoriteExerciseIds: Set<String> = emptySet(),
     onToggleChapterFavorite: (String) -> Unit = {},
@@ -64,14 +77,36 @@ fun SearchScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var query by remember { mutableStateOf("") }
-    var selectedTab by remember(initialTab) { mutableIntStateOf(initialTab) }
+    val pagerState = rememberPagerState(initialPage = searchTab.coerceIn(0, 1), pageCount = { 2 })
+    val coroutineScope = rememberCoroutineScope()
     val focusRequester = remember { FocusRequester() }
     val keyboardController = LocalSoftwareKeyboardController.current
 
+    val chapterListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = chapterScrollIndex,
+        initialFirstVisibleItemScrollOffset = chapterScrollOffset
+    )
+    val exerciseListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = exerciseScrollIndex,
+        initialFirstVisibleItemScrollOffset = exerciseScrollOffset
+    )
+
+    LaunchedEffect(pagerState.currentPage) {
+        onTabChange(pagerState.currentPage)
+    }
+
     LaunchedEffect(Unit) {
-        focusRequester.requestFocus()
-        keyboardController?.show()
+        if (query.isBlank()) {
+            focusRequester.requestFocus()
+            keyboardController?.show()
+        }
+    }
+
+    LaunchedEffect(chapterListState.firstVisibleItemIndex, chapterListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(false, chapterListState.firstVisibleItemIndex, chapterListState.firstVisibleItemScrollOffset)
+    }
+    LaunchedEffect(exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(true, exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset)
     }
 
     val queryTrimmed = query.trim()
@@ -145,7 +180,7 @@ fun SearchScreen(
                     title = {
                         BasicTextField(
                             value = query,
-                            onValueChange = { query = it },
+                            onValueChange = onQueryChange,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .focusRequester(focusRequester),
@@ -178,7 +213,11 @@ fun SearchScreen(
                     },
                     actions = {
                         if (query.isNotEmpty()) {
-                            IconButton(onClick = { query = "" }) {
+                            IconButton(onClick = {
+                                onQueryChange("")
+                                focusRequester.requestFocus()
+                                keyboardController?.show()
+                            }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = "清除",
@@ -200,67 +239,119 @@ fun SearchScreen(
                 .padding(innerPadding)
         ) {
             LunyuFixedTabRow(
-                selectedTabIndex = selectedTab,
-                tabs = listOf("章节 (${matchingChapters.size})", "试题 (${matchingExercises.size})"),
-                onTabSelected = { selectedTab = it }
+                selectedTabIndex = pagerState.currentPage,
+                pagerState = pagerState,
+                tabs = listOf("章节", "试题"),
+                onTabSelected = { index ->
+                    coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                }
             )
 
-            if (queryTrimmed.isBlank()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "输入关键词搜索论语章节与试题",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    )
-                }
-            } else if (selectedTab == 0) {
-                if (matchingChapters.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "没有找到匹配的章节",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(matchingChapters) { index, (pian, chapter) ->
-                            val isFav = favoriteChapterIds.contains(chapter.id)
-                            PianChapterRow(
-                                chapter = chapter,
-                                isFavorite = isFav,
-                                onToggleFavorite = { onToggleChapterFavorite(chapter.id) },
-                                onClick = { onNavigateToChapter(pian.slug, chapter.number) },
-                                highlightTerms = highlightTerms,
-                                showDivider = index < matchingChapters.size - 1
-                            )
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize()
+            ) { page ->
+                when (page) {
+                    0 -> {
+                        if (queryTrimmed.isBlank()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "输入关键词搜索论语章节与试题",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        } else if (matchingChapters.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "没有找到匹配的章节",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                state = chapterListState,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                item {
+                                    Text(
+                                        text = "共 ${matchingChapters.size} 章",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Normal,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                    )
+                                }
+
+                                itemsIndexed(matchingChapters) { index, (pian, chapter) ->
+                                    val isFav = favoriteChapterIds.contains(chapter.id)
+                                    PianChapterRow(
+                                        chapter = chapter,
+                                        isFavorite = isFav,
+                                        onToggleFavorite = { onToggleChapterFavorite(chapter.id) },
+                                        onClick = { onNavigateToChapter(pian.slug, chapter.number) },
+                                        highlightTerms = highlightTerms,
+                                        showDivider = index < matchingChapters.size - 1
+                                    )
+                                }
+
+                                item { Spacer(modifier = Modifier.height(32.dp)) }
+                            }
                         }
                     }
-                }
-            } else {
-                if (matchingExercises.isEmpty()) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        Text(
-                            text = "没有找到匹配的试题",
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                    }
-                } else {
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(matchingExercises) { index, exercise ->
-                            val isFav = favoriteExerciseIds.contains(exercise.id)
-                            ExerciseListRow(
-                                exercise = exercise,
-                                isFavorite = isFav,
-                                onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
-                                onClick = { onNavigateToExercise(exercise.id) },
-                                highlightTerms = emptyList(),
-                                showDivider = index < matchingExercises.size - 1
-                            )
+                    1 -> {
+                        if (queryTrimmed.isBlank()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "输入关键词搜索论语章节与试题",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        } else if (matchingExercises.isEmpty()) {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "没有找到匹配的试题",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                )
+                            }
+                        } else {
+                            LazyColumn(
+                                state = exerciseListState,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                item {
+                                    Text(
+                                        text = "共 ${matchingExercises.size} 题",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.Normal,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                    )
+                                }
+
+                                itemsIndexed(matchingExercises) { index, exercise ->
+                                    val isFav = favoriteExerciseIds.contains(exercise.id)
+                                    ExerciseListRow(
+                                        exercise = exercise,
+                                        isFavorite = isFav,
+                                        onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
+                                        onClick = { onNavigateToExercise(exercise.id) },
+                                        highlightTerms = emptyList(),
+                                        showDivider = index < matchingExercises.size - 1
+                                    )
+                                }
+
+                                item { Spacer(modifier = Modifier.height(32.dp)) }
+                            }
                         }
                     }
                 }
