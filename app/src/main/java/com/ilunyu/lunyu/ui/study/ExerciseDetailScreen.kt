@@ -233,9 +233,9 @@ fun ExerciseDetailScreen(
                 ) {
                     Text(
                         text = "答案与解析",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         ),
                         modifier = Modifier.weight(1f)
