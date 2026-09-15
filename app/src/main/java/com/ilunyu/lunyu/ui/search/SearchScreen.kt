@@ -258,7 +258,7 @@ fun SearchScreen(
                                 isFavorite = isFav,
                                 onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
                                 onClick = { onNavigateToExercise(exercise.id) },
-                                highlightTerms = highlightTerms,
+                                highlightTerms = emptyList(),
                                 showDivider = index < matchingExercises.size - 1
                             )
                         }
@@ -278,10 +278,6 @@ private fun normalizePianTerm(term: String): String {
 
 private fun Exercise.toSearchableText(): String {
     val sb = StringBuilder(512)
-    sb.append(title).append('\n')
-    sb.append(source).append('\n')
-    sb.append(year).append('\n')
-    sb.append(type).append('\n')
     for (block in question) {
         if (block.text.isNotEmpty()) {
             sb.append(block.text).append('\n')

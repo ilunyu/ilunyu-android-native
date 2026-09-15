@@ -1,6 +1,7 @@
 package com.ilunyu.lunyu
 
 import com.ilunyu.lunyu.data.model.AnalectsLibrary
+import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.ExerciseIndex
 import com.ilunyu.lunyu.data.model.AppFontPreference
 import com.ilunyu.lunyu.data.model.AppThemeMode
@@ -89,28 +90,25 @@ class AnalectsDataTest {
         assertTrue(firstMaterial!!.paragraphs.any { it.text.contains("侍坐") || it.text.contains("夫子何哂由也") })
 
         // Test searching for classical quotes: "侍坐", "富与贵", "温故而知新"
-        val queryShizuo = "侍坐"
-        val matchesShizuo = index.exercises.filter { ex ->
+        fun Exercise.toContentText(): String {
             val sb = StringBuilder()
-            sb.append(ex.title).append('\n').append(ex.source).append('\n')
-            for (b in ex.question) {
+            for (b in question) {
                 sb.append(b.text).append('\n').append(b.blocktitle).append('\n').append(b.sourcename).append('\n')
                 for (p in b.paragraphs) sb.append(p.text).append('\n')
             }
-            sb.toString().contains(queryShizuo)
+            return sb.toString()
         }
+
+        val queryShizuo = "侍坐"
+        val matchesShizuo = index.exercises.filter { it.toContentText().contains(queryShizuo) }
         assertTrue("Searching '侍坐' must find matching exercises", matchesShizuo.isNotEmpty())
 
         val queryFuyugui = "富与贵"
-        val matchesFuyugui = index.exercises.filter { ex ->
-            val sb = StringBuilder()
-            sb.append(ex.title).append('\n').append(ex.source).append('\n')
-            for (b in ex.question) {
-                sb.append(b.text).append('\n').append(b.blocktitle).append('\n').append(b.sourcename).append('\n')
-                for (p in b.paragraphs) sb.append(p.text).append('\n')
-            }
-            sb.toString().contains(queryFuyugui)
-        }
+        val matchesFuyugui = index.exercises.filter { it.toContentText().contains(queryFuyugui) }
         assertTrue("Searching '富与贵' must find matching exercises", matchesFuyugui.isNotEmpty())
+
+        // Test that title/source metadata like "昌平二模" or "2024" without question content does not match
+        val matchesMockTitle = index.exercises.filter { it.toContentText().contains("昌平二模") }
+        assertTrue("Searching '昌平二模' in question content should return empty", matchesMockTitle.isEmpty())
     }
 }
