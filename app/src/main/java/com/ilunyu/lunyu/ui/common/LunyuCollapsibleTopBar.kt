@@ -384,7 +384,74 @@ fun LunyuCollapsibleTabLayout(
 }
 
 /**
- * 兼容旧接口的顶栏脚手架
+ * 论语可折叠单顶栏脚手架（无 TabBar 场景，适用于章阅读等详情页面）
+ *
+ * 布局物理架构：
+ * - 顶栏 (TopBar 56dp) 位于顶部，初始展开；
+ * - 下方主内容 (Content) 紧贴顶栏底部；
+ * - 向上滑动时，TopBar 向上平移移出屏幕，Content 同步跟手向上平移；
+ * - 向下滑动时，TopBar 从顶部落下展开，Content 同步跟手向下平移；
+ * - 顶栏在完全收起时位移为 -barHeightPx，展开时为 0；
+ * - 采用 placeWithLayer 进行纯 GPU 硬件图层平移，不触发全局重新测量与重排。
+ */
+@Composable
+fun LunyuCollapsibleSingleTopBarLayout(
+    scrollState: LunyuTopBarScrollState,
+    topBar: @Composable () -> Unit,
+    modifier: Modifier = Modifier,
+    applyStatusBarsPadding: Boolean = true,
+    content: @Composable () -> Unit
+) {
+    Layout(
+        content = {
+            // Child 0: TopBar
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                topBar()
+            }
+            // Child 1: Content
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clipToBounds()
+            ) {
+                content()
+            }
+        },
+        modifier = modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.surface)
+            .then(if (applyStatusBarsPadding) Modifier.statusBarsPadding() else Modifier)
+            .nestedScroll(scrollState.nestedScrollConnection)
+            .clipToBounds()
+    ) { measurables, constraints ->
+        val topBarPlaceable = measurables[0].measure(constraints.copy(minHeight = 0))
+        val topBarHeight = topBarPlaceable.height
+
+        scrollState.updateBarHeightPx(topBarHeight.toFloat())
+
+        val contentPlaceable = measurables[1].measure(
+            constraints.copy(minHeight = constraints.maxHeight, maxHeight = constraints.maxHeight)
+        )
+
+        layout(constraints.maxWidth, constraints.maxHeight) {
+            val currentOffset = scrollState.offset.roundToInt() // [-topBarHeight, 0]
+
+            // Child 1: Content 在 Z 轴底层
+            contentPlaceable.placeWithLayer(0, topBarHeight + currentOffset)
+
+            // Child 0: TopBar 在 Z 轴顶层
+            topBarPlaceable.placeWithLayer(0, currentOffset)
+        }
+    }
+}
+
+/**
+ * 论语统一可折叠顶栏脚手架
  */
 @Composable
 fun LunyuCollapsibleTopBarLayout(
@@ -405,20 +472,12 @@ fun LunyuCollapsibleTopBarLayout(
             content = content
         )
     } else {
-        Column(
-            modifier = modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .then(if (applyStatusBarsPadding) Modifier.statusBarsPadding() else Modifier)
-        ) {
-            topBar()
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-            ) {
-                content()
-            }
-        }
+        LunyuCollapsibleSingleTopBarLayout(
+            scrollState = scrollState,
+            topBar = topBar,
+            modifier = modifier,
+            applyStatusBarsPadding = applyStatusBarsPadding,
+            content = content
+        )
     }
 }

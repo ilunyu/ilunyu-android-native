@@ -97,65 +97,73 @@ fun ChapterScreen(
     }
 
     val lazyListState = rememberLazyListState()
+    val scrollState = rememberLunyuTopBarScrollState()
     val isScrolledUnder by remember {
         derivedStateOf {
             lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding()
-    ) {
-        LunyuTopBar(
-            showDivider = isScrolledUnder,
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回本篇"
-                    )
-                }
-            },
-            actions = {
-                // 复制原文按钮
-                IconButton(
-                    onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Chapter Text", chapter.plainText)
-                        clipboard.setPrimaryClip(clip)
-                        isCopied = true
-                        Toast.makeText(context, "已复制原文", Toast.LENGTH_SHORT).show()
-                    }
-                ) {
-                    Icon(
-                        imageVector = if (isCopied) Icons.Default.Check else Icons.Outlined.ContentCopy,
-                        contentDescription = "复制原文"
-                    )
-                }
-                // 收藏按钮
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (isFavorite) "取消收藏" else "收藏本章",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-        )
+    // 切换章节时重置滚动位置并完全展开顶栏
+    LaunchedEffect(chapter.id) {
+        scrollState.expand()
+        lazyListState.scrollToItem(0)
+    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+    // 列表滚动回最顶部时，保证顶栏完全展开
+    LaunchedEffect(isScrolledUnder) {
+        if (!isScrolledUnder && !scrollState.isExpanded) {
+            scrollState.expand()
+        }
+    }
+
+    LunyuCollapsibleTopBarLayout(
+        scrollState = scrollState,
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            LunyuTopBar(
+                showDivider = isScrolledUnder,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回本篇"
+                        )
+                    }
+                },
+                actions = {
+                    // 复制原文按钮
+                    IconButton(
+                        onClick = {
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            val clip = ClipData.newPlainText("Chapter Text", chapter.plainText)
+                            clipboard.setPrimaryClip(clip)
+                            isCopied = true
+                            Toast.makeText(context, "已复制原文", Toast.LENGTH_SHORT).show()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = if (isCopied) Icons.Default.Check else Icons.Outlined.ContentCopy,
+                            contentDescription = "复制原文"
+                        )
+                    }
+                    // 收藏按钮
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = if (isFavorite) "取消收藏" else "收藏本章",
+                            tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+            )
+        }
+    ) {
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxSize()
         ) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
             // 1. 原文部分（完全对齐 Flutter _ChapterReadingContentHeader）
             // 段首带有 primary 色的 displayId（例如 "4·1 "），行内注释使用圆形角标 ①, ②...
             item {
@@ -459,9 +467,8 @@ fun ChapterScreen(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }
-}
 }
