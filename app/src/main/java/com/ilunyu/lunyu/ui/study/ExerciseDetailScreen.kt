@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -248,15 +250,17 @@ fun ExerciseDetailScreen(
                     visible = isAnswerExpanded,
                     enter = expandVertically(
                         expandFrom = Alignment.Top,
-                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
-                    ) + fadeIn(
-                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
+                    ) + slideInVertically(
+                        initialOffsetY = { -it },
+                        animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
                     ),
                     exit = shrinkVertically(
                         shrinkTowards = Alignment.Top,
-                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
-                    ) + fadeOut(
-                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
+                    ) + slideOutVertically(
+                        targetOffsetY = { -it },
+                        animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
                     )
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
