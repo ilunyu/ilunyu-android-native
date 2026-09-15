@@ -39,7 +39,8 @@ data class ExerciseBlock(
     val sourceid: Int? = null,
     val blocktitle: String = "",
     val sourcename: String = "",
-    val paragraphs: List<ExerciseParagraph> = emptyList()
+    val paragraphs: List<ExerciseParagraph> = emptyList(),
+    val format: ExerciseFormat? = null
 ) {
     val isMaterial: Boolean get() = type == "material"
     val isNote: Boolean get() = type == "note"
@@ -47,5 +48,30 @@ data class ExerciseBlock(
 
 @Serializable
 data class ExerciseParagraph(
-    val text: String = ""
+    val text: String = "",
+    val format: ExerciseFormat? = null
+)
+
+@Serializable
+data class ExerciseFormat(
+    val indent: ExerciseIndent? = null,
+    val marks: ExerciseMarks? = null
+)
+
+@Serializable
+data class ExerciseIndent(
+    val kind: String = "",
+    val level: Int = 1
+)
+
+@Serializable
+data class ExerciseMarks(
+    val underline: List<ExerciseTextRange> = emptyList(),
+    val emphasis: List<ExerciseTextRange> = emptyList()
+)
+
+@Serializable
+data class ExerciseTextRange(
+    val start: Int = 0,
+    val end: Int = 0
 )

@@ -64,8 +64,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextIndent
+import androidx.compose.ui.unit.TextUnit
 import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.ExerciseBlock
+import com.ilunyu.lunyu.data.model.ExerciseFormat
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -319,23 +330,21 @@ private fun ExerciseBlockItem(
                 if (block.paragraphs.isNotEmpty()) {
                     block.paragraphs.forEachIndexed { idx, p ->
                         if (idx > 0) Spacer(modifier = Modifier.height(8.dp))
-                        Text(
+                        ExerciseFormattedText(
                             text = p.text,
-                            style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 16.sp,
-                                lineHeight = 28.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                    }
-                } else if (block.text.isNotBlank()) {
-                    Text(
-                        text = block.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(
+                            format = p.format ?: block.format,
                             fontSize = 16.sp,
                             lineHeight = 28.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                } else if (block.text.isNotBlank()) {
+                    ExerciseFormattedText(
+                        text = block.text,
+                        format = block.format,
+                        fontSize = 16.sp,
+                        lineHeight = 28.sp,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
                 }
 
@@ -419,25 +428,132 @@ private fun ExerciseBlockItem(
             if (block.paragraphs.isNotEmpty()) {
                 block.paragraphs.forEachIndexed { idx, p ->
                     if (idx > 0) Spacer(modifier = Modifier.height(6.dp))
-                    Text(
+                    ExerciseFormattedText(
                         text = p.text,
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = contentFontSize,
-                            lineHeight = contentLineHeight,
-                            color = contentColor
-                        )
-                    )
-                }
-            } else if (block.text.isNotBlank()) {
-                Text(
-                    text = block.text,
-                    style = MaterialTheme.typography.bodyMedium.copy(
+                        format = p.format ?: block.format,
                         fontSize = contentFontSize,
                         lineHeight = contentLineHeight,
                         color = contentColor
                     )
+                }
+            } else if (block.text.isNotBlank()) {
+                ExerciseFormattedText(
+                    text = block.text,
+                    format = block.format,
+                    fontSize = contentFontSize,
+                    lineHeight = contentLineHeight,
+                    color = contentColor
                 )
             }
         }
     }
+}
+
+/**
+ * 试题富文本渲染组件：
+ * 支持首行缩进（firstLine）、悬挂缩进（hanging）、段落整段缩进（paragraph）、
+ * 下划线（underline）及着重点（emphasis）。
+ */
+@Composable
+private fun ExerciseFormattedText(
+    text: String,
+    format: ExerciseFormat?,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurface,
+    fontSize: TextUnit = 16.sp,
+    lineHeight: TextUnit = 28.sp,
+    fontWeight: FontWeight? = null
+) {
+    if (text.isBlank()) return
+
+    val indent = format?.indent
+    val indentLevel = indent?.level ?: 0
+    val indentKind = indent?.kind.orEmpty()
+
+    val textIndent = when {
+        indentLevel > 0 && indentKind == "firstLine" -> {
+            TextIndent(firstLine = (fontSize.value * indentLevel).sp, restLine = 0.sp)
+        }
+        indentLevel > 0 && indentKind == "hanging" -> {
+            TextIndent(firstLine = 0.sp, restLine = (fontSize.value * indentLevel).sp)
+        }
+        else -> null
+    }
+
+    val paragraphStartPadding = if (indentLevel > 0 && indentKind == "paragraph") {
+        (fontSize.value * indentLevel).dp
+    } else {
+        0.dp
+    }
+
+    val underlineRanges = format?.marks?.underline.orEmpty()
+    val emphasisRanges = format?.marks?.emphasis.orEmpty()
+
+    val annotatedText = remember(text, underlineRanges) {
+        if (underlineRanges.isEmpty()) {
+            AnnotatedString(text)
+        } else {
+            buildAnnotatedString {
+                append(text)
+                underlineRanges.forEach { range ->
+                    val start = range.start.coerceIn(0, text.length)
+                    val end = range.end.coerceIn(start, text.length)
+                    if (start < end) {
+                        addStyle(
+                            style = SpanStyle(textDecoration = TextDecoration.Underline),
+                            start = start,
+                            end = end
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    var textLayoutResult by remember(text, format) { mutableStateOf<TextLayoutResult?>(null) }
+
+    val dotModifier = if (emphasisRanges.isNotEmpty()) {
+        Modifier
+            .padding(bottom = 3.dp)
+            .drawBehind {
+                val layout = textLayoutResult ?: return@drawBehind
+                val textLength = layout.layoutInput.text.length
+                val dotRadius = if (fontSize <= 14.sp) 1.4.dp.toPx() else 1.6.dp.toPx()
+                val dotYOffset = if (fontSize <= 14.sp) 4.0.dp.toPx() else 4.8.dp.toPx()
+                emphasisRanges.forEach { range ->
+                    val start = range.start.coerceIn(0, textLength)
+                    val end = range.end.coerceIn(start, textLength)
+                    for (i in start until end) {
+                        if (i < textLength && layout.layoutInput.text[i].isWhitespace()) continue
+                        val line = layout.getLineForOffset(i)
+                        val baseline = layout.getLineBaseline(line)
+                        val box = layout.getBoundingBox(i)
+                        val centerX = (box.left + box.right) / 2f
+                        val centerY = baseline + dotYOffset
+                        drawCircle(
+                            color = color,
+                            radius = dotRadius,
+                            center = Offset(centerX, centerY)
+                        )
+                    }
+                }
+            }
+    } else {
+        Modifier
+    }
+
+    Text(
+        text = annotatedText,
+        style = MaterialTheme.typography.bodyMedium.copy(
+            fontSize = fontSize,
+            lineHeight = lineHeight,
+            color = color,
+            fontWeight = fontWeight ?: FontWeight.Normal,
+            textIndent = textIndent
+        ),
+        onTextLayout = { textLayoutResult = it },
+        modifier = modifier
+            .then(if (paragraphStartPadding > 0.dp) Modifier.padding(start = paragraphStartPadding) else Modifier)
+            .then(dotModifier)
+    )
 }
