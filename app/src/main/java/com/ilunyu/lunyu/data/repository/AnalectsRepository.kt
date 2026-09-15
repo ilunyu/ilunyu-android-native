@@ -19,6 +19,7 @@ class AnalectsRepository(private val context: Context) {
 
     private var cachedLibrary: AnalectsLibrary? = null
     private var cachedEditions: List<EditionSummary> = emptyList()
+    private val detailedChapterCache = java.util.concurrent.ConcurrentHashMap<String, Chapter>()
 
     suspend fun getEditions(): List<EditionSummary> = withContext(Dispatchers.IO) {
         if (cachedEditions.isNotEmpty()) return@withContext cachedEditions
@@ -48,10 +49,13 @@ class AnalectsRepository(private val context: Context) {
     suspend fun getChapter(pianSlug: String, chapterNumber: Int): Pair<Pian, Chapter>? = withContext(Dispatchers.IO) {
         val pian = getPianBySlug(pianSlug) ?: return@withContext null
         val chapterSummary = pian.chapters.find { it.number == chapterNumber } ?: return@withContext null
+        val cached = detailedChapterCache[chapterSummary.id]
+        if (cached != null) return@withContext pian to cached
         try {
             val detailPath = "content/editions/yangbojun-chapter-${chapterSummary.id}.json"
             val detailContent = context.assets.open(detailPath).bufferedReader().use { it.readText() }
             val detailedChapter = json.decodeFromString<Chapter>(detailContent)
+            detailedChapterCache[chapterSummary.id] = detailedChapter
             pian to detailedChapter
         } catch (_: Exception) {
             pian to chapterSummary
@@ -59,14 +63,17 @@ class AnalectsRepository(private val context: Context) {
     }
 
     suspend fun getChapterById(chapterId: String): Pair<Pian, Chapter>? = withContext(Dispatchers.IO) {
+        val cached = detailedChapterCache[chapterId]
         val library = getLibrary()
         for (pian in library.pians) {
             val chapterSummary = pian.chapters.find { it.id == chapterId }
             if (chapterSummary != null) {
+                if (cached != null) return@withContext pian to cached
                 return@withContext try {
                     val detailPath = "content/editions/yangbojun-chapter-${chapterSummary.id}.json"
                     val detailContent = context.assets.open(detailPath).bufferedReader().use { it.readText() }
                     val detailedChapter = json.decodeFromString<Chapter>(detailContent)
+                    detailedChapterCache[chapterId] = detailedChapter
                     pian to detailedChapter
                 } catch (_: Exception) {
                     pian to chapterSummary

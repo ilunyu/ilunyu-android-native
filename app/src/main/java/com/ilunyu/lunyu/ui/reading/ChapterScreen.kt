@@ -174,6 +174,7 @@ fun ChapterScreen(
                             val noteIdx = chapter.annotations.indexOfFirst { it.index == noteNum }
                             if (noteIdx >= 0) {
                                 coroutineScope.launch {
+                                    delay(80)
                                     lazyListState.animateScrollToItem(3 + noteIdx)
                                 }
                             }
@@ -266,6 +267,7 @@ fun ChapterScreen(
                             onClick = {
                                 highlightedAnnotationIndex = note.index
                                 coroutineScope.launch {
+                                    delay(100)
                                     lazyListState.animateScrollToItem(0)
                                 }
                             },

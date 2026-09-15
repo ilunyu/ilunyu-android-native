@@ -1,6 +1,17 @@
 package com.ilunyu.lunyu.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutLinearInEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -183,78 +194,228 @@ fun MainScreen(
                 .fillMaxSize()
                 .padding(bottom = innerPadding.calculateBottomPadding())
         ) {
-            when (val dest = currentDestination) {
-                is ScreenDestination.Tab -> {
-                    when (dest.index) {
-                        0 -> ReadingScreen(
-                            library = library,
-                            activePianSlug = activePianSlug,
-                            onActivePianChanged = { activePianSlug = it },
-                            favoriteChapterIds = favoriteChapters,
-                            onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
-                            onNavigateToChapter = { slug, number ->
-                                activePianSlug = slug
-                                currentDestination = ScreenDestination.ChapterDetail(slug, number)
-                            },
-                            onNavigateToSearch = {
-                                currentDestination = ScreenDestination.Search
+            AnimatedContent(
+                targetState = currentDestination,
+                transitionSpec = {
+                    val initial = initialState
+                    val target = targetState
+                    when {
+                        // 1. 同级章节横向切章（ChapterDetail -> ChapterDetail）
+                        initial is ScreenDestination.ChapterDetail && target is ScreenDestination.ChapterDetail -> {
+                            val pians = library?.pians ?: emptyList()
+                            val initPianIdx = pians.indexOfFirst { it.slug == initial.pianSlug }
+                            val targetPianIdx = pians.indexOfFirst { it.slug == target.pianSlug }
+                            val isForward = if (targetPianIdx != initPianIdx) {
+                                targetPianIdx > initPianIdx
+                            } else {
+                                target.chapterNumber > initial.chapterNumber
                             }
-                        )
-                        1 -> StudyScreen(
-                            exercises = exercises,
-                            favoriteExerciseIds = favoriteExercises,
-                            onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
-                            onNavigateToExercise = { exerciseId ->
-                                currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
-                            },
-                            onNavigateToSearch = {
-                                currentDestination = ScreenDestination.Search
+                            if (isForward) {
+                                (slideInHorizontally(
+                                    initialOffsetX = { (it * 0.35f).toInt() },
+                                    animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                ) + fadeIn(
+                                    animationSpec = tween(200, easing = LinearOutSlowInEasing)
+                                )) togetherWith (
+                                    slideOutHorizontally(
+                                        targetOffsetX = { -(it * 0.30f).toInt() },
+                                        animationSpec = tween(220, easing = FastOutSlowInEasing)
+                                    ) + fadeOut(
+                                        animationSpec = tween(180, easing = FastOutLinearInEasing)
+                                    )
+                                )
+                            } else {
+                                (slideInHorizontally(
+                                    initialOffsetX = { -(it * 0.35f).toInt() },
+                                    animationSpec = tween(240, easing = FastOutSlowInEasing)
+                                ) + fadeIn(
+                                    animationSpec = tween(200, easing = LinearOutSlowInEasing)
+                                )) togetherWith (
+                                    slideOutHorizontally(
+                                        targetOffsetX = { (it * 0.30f).toInt() },
+                                        animationSpec = tween(220, easing = FastOutSlowInEasing)
+                                    ) + fadeOut(
+                                        animationSpec = tween(180, easing = FastOutLinearInEasing)
+                                    )
+                                )
                             }
-                        )
-                        2 -> FavoritesScreen(
-                            favoriteChapterIds = favoriteChapters,
-                            favoriteExerciseIds = favoriteExercises,
-                            allPians = library?.pians ?: emptyList(),
-                            allExercises = exercises,
-                            onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
-                            onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
-                            onNavigateToChapter = { slug, number ->
-                                activePianSlug = slug
-                                currentDestination = ScreenDestination.ChapterDetail(slug, number)
-                            },
-                            onNavigateToExercise = { exerciseId ->
-                                currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
-                            },
-                            onNavigateToSearch = {
-                                currentDestination = ScreenDestination.Search
-                            }
-                        )
-                        3 -> SettingsScreen(
-                            currentThemeMode = themeMode,
-                            currentFontPreference = fontPreference,
-                            onThemeModeChanged = { viewModel.setThemeMode(it) },
-                            onFontPreferenceChanged = { viewModel.setFontPreference(it) }
-                        )
-                    }
-                }
-                is ScreenDestination.ChapterDetail -> {
-                    val chapterData by produceState<Pair<Pian, Chapter>?>(initialValue = null, dest.pianSlug, dest.chapterNumber) {
-                        value = viewModel.getChapterDetail(dest.pianSlug, dest.chapterNumber)
-                    }
-                    val adjacentChapters by produceState<Pair<Pair<Pian, Chapter>?, Pair<Pian, Chapter>?>>(initialValue = null to null, dest.pianSlug, dest.chapterNumber) {
-                        value = viewModel.getAdjacentChapters(dest.pianSlug, dest.chapterNumber)
-                    }
+                        }
 
-                    val data = chapterData
-                    if (data != null) {
-                        val (pian, chapter) = data
-                        ChapterScreen(
-                            pian = pian,
-                            chapter = chapter,
-                            prevChapter = adjacentChapters.first,
-                            nextChapter = adjacentChapters.second,
-                            isFavorite = favoriteChapters.contains(chapter.id),
-                            onToggleFavorite = { viewModel.toggleChapterFavorite(chapter.id) },
+                        // 2. 底部导航栏 Tab 间切换（Tab -> Tab）采用 MD3 Fade Through
+                        initial is ScreenDestination.Tab && target is ScreenDestination.Tab -> {
+                            (fadeIn(
+                                animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)
+                            ) + scaleIn(
+                                initialScale = 0.96f,
+                                animationSpec = tween(200, delayMillis = 40, easing = FastOutSlowInEasing)
+                            )) togetherWith (
+                                fadeOut(
+                                    animationSpec = tween(140, easing = FastOutLinearInEasing)
+                                )
+                            )
+                        }
+
+                        // 3. 返回上一级页面（如详情页返回 Tab，或详情页返回 Search）
+                        (initial !is ScreenDestination.Tab && target is ScreenDestination.Tab) ||
+                        ((initial is ScreenDestination.ChapterDetail || initial is ScreenDestination.ExerciseDetail) && target is ScreenDestination.Search) -> {
+                            (slideInHorizontally(
+                                initialOffsetX = { -(it * 0.20f).toInt() },
+                                animationSpec = tween(240, easing = FastOutSlowInEasing)
+                            ) + fadeIn(
+                                animationSpec = tween(220, easing = LinearOutSlowInEasing)
+                            )) togetherWith (
+                                slideOutHorizontally(
+                                    targetOffsetX = { (it * 0.30f).toInt() },
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing)
+                                ) + fadeOut(
+                                    animationSpec = tween(180, easing = FastOutLinearInEasing)
+                                )
+                            )
+                        }
+
+                        // 4. 前进进入下一级（如 Tab -> ChapterDetail / ExerciseDetail / Search，或 ChapterDetail -> ExerciseDetail）
+                        else -> {
+                            (slideInHorizontally(
+                                initialOffsetX = { (it * 0.30f).toInt() },
+                                animationSpec = tween(250, easing = FastOutSlowInEasing)
+                            ) + fadeIn(
+                                animationSpec = tween(220, easing = LinearOutSlowInEasing)
+                            )) togetherWith (
+                                slideOutHorizontally(
+                                    targetOffsetX = { -(it * 0.20f).toInt() },
+                                    animationSpec = tween(220, easing = FastOutSlowInEasing)
+                                ) + fadeOut(
+                                    animationSpec = tween(180, easing = FastOutLinearInEasing)
+                                )
+                            )
+                        }
+                    }
+                },
+                label = "MainScreenDestinationTransition",
+                modifier = Modifier.fillMaxSize()
+            ) { dest ->
+                when (dest) {
+                    is ScreenDestination.Tab -> {
+                        when (dest.index) {
+                            0 -> ReadingScreen(
+                                library = library,
+                                activePianSlug = activePianSlug,
+                                onActivePianChanged = { activePianSlug = it },
+                                favoriteChapterIds = favoriteChapters,
+                                onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
+                                onNavigateToChapter = { slug, number ->
+                                    activePianSlug = slug
+                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                },
+                                onNavigateToSearch = {
+                                    currentDestination = ScreenDestination.Search
+                                }
+                            )
+                            1 -> StudyScreen(
+                                exercises = exercises,
+                                favoriteExerciseIds = favoriteExercises,
+                                onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
+                                onNavigateToExercise = { exerciseId ->
+                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                },
+                                onNavigateToSearch = {
+                                    currentDestination = ScreenDestination.Search
+                                }
+                            )
+                            2 -> FavoritesScreen(
+                                favoriteChapterIds = favoriteChapters,
+                                favoriteExerciseIds = favoriteExercises,
+                                allPians = library?.pians ?: emptyList(),
+                                allExercises = exercises,
+                                onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
+                                onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
+                                onNavigateToChapter = { slug, number ->
+                                    activePianSlug = slug
+                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                },
+                                onNavigateToExercise = { exerciseId ->
+                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                },
+                                onNavigateToSearch = {
+                                    currentDestination = ScreenDestination.Search
+                                }
+                            )
+                            3 -> SettingsScreen(
+                                currentThemeMode = themeMode,
+                                currentFontPreference = fontPreference,
+                                onThemeModeChanged = { viewModel.setThemeMode(it) },
+                                onFontPreferenceChanged = { viewModel.setFontPreference(it) }
+                            )
+                        }
+                    }
+                    is ScreenDestination.ChapterDetail -> {
+                        val chapterData by produceState<Pair<Pian, Chapter>?>(initialValue = null, dest.pianSlug, dest.chapterNumber) {
+                            value = viewModel.getChapterDetail(dest.pianSlug, dest.chapterNumber)
+                        }
+                        val adjacentChapters by produceState<Pair<Pair<Pian, Chapter>?, Pair<Pian, Chapter>?>>(initialValue = null to null, dest.pianSlug, dest.chapterNumber) {
+                            value = viewModel.getAdjacentChapters(dest.pianSlug, dest.chapterNumber)
+                        }
+
+                        val data = chapterData
+                        if (data != null) {
+                            val (pian, chapter) = data
+                            ChapterScreen(
+                                pian = pian,
+                                chapter = chapter,
+                                prevChapter = adjacentChapters.first,
+                                nextChapter = adjacentChapters.second,
+                                isFavorite = favoriteChapters.contains(chapter.id),
+                                onToggleFavorite = { viewModel.toggleChapterFavorite(chapter.id) },
+                                onNavigateToChapter = { slug, number ->
+                                    activePianSlug = slug
+                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                },
+                                onNavigateToExercise = { exerciseId ->
+                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                },
+                                onBack = {
+                                    currentDestination = ScreenDestination.Tab(selectedTab)
+                                }
+                            )
+                        } else {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+                    is ScreenDestination.ExerciseDetail -> {
+                        val exerciseData by produceState<Exercise?>(initialValue = null, dest.exerciseId) {
+                            value = viewModel.getExerciseDetail(dest.exerciseId)
+                        }
+                        val exercise = exerciseData
+                        if (exercise != null) {
+                            ExerciseDetailScreen(
+                                exercise = exercise,
+                                isFavorite = favoriteExercises.contains(exercise.id),
+                                onToggleFavorite = { viewModel.toggleExerciseFavorite(exercise.id) },
+                                onOpenChapterSourceId = { sourceId ->
+                                    coroutineScope.launch {
+                                        val target = viewModel.getChapterById("$sourceId")
+                                        if (target != null) {
+                                            activePianSlug = target.first.slug
+                                            currentDestination = ScreenDestination.ChapterDetail(target.first.slug, target.second.number)
+                                        }
+                                    }
+                                },
+                                onBack = {
+                                    currentDestination = ScreenDestination.Tab(selectedTab)
+                                }
+                            )
+                        } else {
+                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                                CircularProgressIndicator()
+                            }
+                        }
+                    }
+                    is ScreenDestination.Search -> {
+                        SearchScreen(
+                            library = library,
+                            exercises = exercises,
                             onNavigateToChapter = { slug, number ->
                                 activePianSlug = slug
                                 currentDestination = ScreenDestination.ChapterDetail(slug, number)
@@ -266,56 +427,7 @@ fun MainScreen(
                                 currentDestination = ScreenDestination.Tab(selectedTab)
                             }
                         )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
                     }
-                }
-                is ScreenDestination.ExerciseDetail -> {
-                    val exerciseData by produceState<Exercise?>(initialValue = null, dest.exerciseId) {
-                        value = viewModel.getExerciseDetail(dest.exerciseId)
-                    }
-                    val exercise = exerciseData
-                    if (exercise != null) {
-                        ExerciseDetailScreen(
-                            exercise = exercise,
-                            isFavorite = favoriteExercises.contains(exercise.id),
-                            onToggleFavorite = { viewModel.toggleExerciseFavorite(exercise.id) },
-                            onOpenChapterSourceId = { sourceId ->
-                                coroutineScope.launch {
-                                    val target = viewModel.getChapterById("$sourceId")
-                                    if (target != null) {
-                                        activePianSlug = target.first.slug
-                                        currentDestination = ScreenDestination.ChapterDetail(target.first.slug, target.second.number)
-                                    }
-                                }
-                            },
-                            onBack = {
-                                currentDestination = ScreenDestination.Tab(selectedTab)
-                            }
-                        )
-                    } else {
-                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                            CircularProgressIndicator()
-                        }
-                    }
-                }
-                is ScreenDestination.Search -> {
-                    SearchScreen(
-                        library = library,
-                        exercises = exercises,
-                        onNavigateToChapter = { slug, number ->
-                            activePianSlug = slug
-                            currentDestination = ScreenDestination.ChapterDetail(slug, number)
-                        },
-                        onNavigateToExercise = { exerciseId ->
-                            currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
-                        },
-                        onBack = {
-                            currentDestination = ScreenDestination.Tab(selectedTab)
-                        }
-                    )
                 }
             }
         }
