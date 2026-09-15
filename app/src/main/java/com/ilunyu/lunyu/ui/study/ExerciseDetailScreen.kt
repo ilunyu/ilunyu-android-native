@@ -199,20 +199,18 @@ fun ExerciseDetailScreen(
                 )
             }
 
-            // 原文与答案之间留出 48dp 留白（40dp spacer + 8dp row padding = 48dp）
+            // 原文与答案之间留出 48dp 留白（36dp Spacer + 12dp 行内上边距 = 48dp）
             item {
-                Spacer(modifier = Modifier.height(40.dp))
+                Spacer(modifier = Modifier.height(36.dp))
             }
 
-            // 3. 答案与解析标题（整行可点按，最右侧带指示展开/收起的箭头）
+            // 3. 答案与解析标题（整行全宽矩形可点按，顶到屏幕两边，最右侧带指示展开/收起的箭头）
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp)
-                        .clip(RoundedCornerShape(12.dp))
                         .clickable { isAnswerExpanded = !isAnswerExpanded }
-                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -237,10 +235,11 @@ fun ExerciseDetailScreen(
 
             // 4. 答案与解析具体内容（收起/展开）
             if (isAnswerExpanded) {
-                items(exercise.answer) { block ->
+                itemsIndexed(exercise.answer) { idx, block ->
                     ExerciseBlockItem(
                         block = block,
-                        onOpenChapterSourceId = onOpenChapterSourceId
+                        onOpenChapterSourceId = onOpenChapterSourceId,
+                        topPadding = if (idx == 0) 4.dp else 8.dp
                     )
                 }
             }
@@ -359,7 +358,16 @@ private fun ExerciseBlockItem(
             }
         }
     } else {
-        // 普通题干或小问说明
+        val isNote = block.isNote
+        val contentFontSize = if (isNote) 14.sp else 16.sp
+        val contentLineHeight = if (isNote) 24.sp else 28.sp
+        val contentColor = if (isNote) {
+            MaterialTheme.colorScheme.onSurfaceVariant
+        } else {
+            MaterialTheme.colorScheme.onSurface
+        }
+
+        // 普通题干、小问说明或答案解析/评分标准
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -369,9 +377,9 @@ private fun ExerciseBlockItem(
                 Text(
                     text = block.blocktitle,
                     style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontSize = contentFontSize,
+                        fontWeight = if (isNote) FontWeight.Normal else FontWeight.SemiBold,
+                        color = contentColor
                     )
                 )
                 Spacer(modifier = Modifier.height(6.dp))
@@ -383,9 +391,9 @@ private fun ExerciseBlockItem(
                     Text(
                         text = p.text,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 16.sp,
-                            lineHeight = 28.sp,
-                            color = MaterialTheme.colorScheme.onSurface
+                            fontSize = contentFontSize,
+                            lineHeight = contentLineHeight,
+                            color = contentColor
                         )
                     )
                 }
@@ -393,9 +401,9 @@ private fun ExerciseBlockItem(
                 Text(
                     text = block.text,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 16.sp,
-                        lineHeight = 28.sp,
-                        color = MaterialTheme.colorScheme.onSurface
+                        fontSize = contentFontSize,
+                        lineHeight = contentLineHeight,
+                        color = contentColor
                     )
                 )
             }
