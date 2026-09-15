@@ -213,7 +213,8 @@ fun ExerciseDetailScreen(
                 ExerciseBlockItem(
                     block = block,
                     onOpenChapterSourceId = onOpenChapterSourceId,
-                    bottomPadding = if (idx == exercise.question.size - 1) 0.dp else 8.dp
+                    topPadding = 4.dp,
+                    bottomPadding = if (idx == exercise.question.size - 1) 0.dp else 4.dp
                 )
             }
 
@@ -279,7 +280,8 @@ fun ExerciseDetailScreen(
                             ExerciseBlockItem(
                                 block = block,
                                 onOpenChapterSourceId = onOpenChapterSourceId,
-                                topPadding = if (idx == 0) 6.dp else 8.dp
+                                topPadding = 4.dp,
+                                bottomPadding = if (idx == exercise.answer.size - 1) 0.dp else 4.dp
                             )
                         }
                     }
@@ -295,8 +297,8 @@ fun ExerciseDetailScreen(
 private fun ExerciseBlockItem(
     block: ExerciseBlock,
     onOpenChapterSourceId: ((Int) -> Unit)?,
-    topPadding: Dp = 8.dp,
-    bottomPadding: Dp = 8.dp
+    topPadding: Dp = 4.dp,
+    bottomPadding: Dp = 4.dp
 ) {
     if (block.isMaterial) {
         // 材料卡片（完全对齐 Flutter _MaterialCard）
