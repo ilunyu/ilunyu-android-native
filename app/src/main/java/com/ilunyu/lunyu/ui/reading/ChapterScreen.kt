@@ -170,7 +170,7 @@ fun ChapterScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp)
+                        .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 48.dp)
                 ) {
                     val rawOrPlain = if (chapter.text.isNotBlank()) chapter.text else chapter.plainText
                     val originalAnnotated = formatChapterOriginalText(
@@ -294,7 +294,7 @@ fun ChapterScreen(
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = if (isHighlighted) {
-                                            MaterialTheme.colorScheme.onPrimary
+                                             MaterialTheme.colorScheme.onPrimary
                                         } else {
                                             MaterialTheme.colorScheme.onSecondaryContainer
                                         }
@@ -357,12 +357,12 @@ fun ChapterScreen(
                             )
                         )
                     } else {
-                        chapter.relatedQuestions.forEach { q ->
+                        chapter.relatedQuestions.forEachIndexed { qIdx, q ->
                             Card(
                                 onClick = { onNavigateToExercise(q.id) },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 4.dp)
+                                    .padding(bottom = if (qIdx == chapter.relatedQuestions.size - 1) 0.dp else 8.dp)
                                     .clip(RoundedCornerShape(12.dp)),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
@@ -394,7 +394,7 @@ fun ChapterScreen(
                             }
                         }
                     }
-                    Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(48.dp))
                 }
             }
 
@@ -403,7 +403,7 @@ fun ChapterScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 24.dp),
+                        .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -467,6 +467,9 @@ fun ChapterScreen(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
+            }
+
+            item {
                 Spacer(modifier = Modifier.height(80.dp))
             }
         }
