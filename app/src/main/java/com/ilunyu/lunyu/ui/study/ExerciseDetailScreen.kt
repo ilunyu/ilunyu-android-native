@@ -47,6 +47,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -204,13 +209,13 @@ fun ExerciseDetailScreen(
                 Spacer(modifier = Modifier.height(36.dp))
             }
 
-            // 3. 答案与解析标题（整行全宽矩形可点按，顶到屏幕两边，最右侧带指示展开/收起的箭头）
+            // 3. 答案与解析标题（整行全宽矩形水波纹可点按；单独点按右侧图标触发局部圆形水波纹）
             item {
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { isAnswerExpanded = !isAnswerExpanded }
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                        .padding(start = 24.dp, end = 12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -222,25 +227,47 @@ fun ExerciseDetailScreen(
                         ),
                         modifier = Modifier.weight(1f)
                     )
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isAnswerExpanded) "收起答案与解析" else "展开答案与解析",
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .rotate(arrowRotation)
-                    )
+                    IconButton(
+                        onClick = { isAnswerExpanded = !isAnswerExpanded }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (isAnswerExpanded) "收起答案与解析" else "展开答案与解析",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier
+                                .size(24.dp)
+                                .rotate(arrowRotation)
+                        )
+                    }
                 }
             }
 
-            // 4. 答案与解析具体内容（收起/展开）
-            if (isAnswerExpanded) {
-                itemsIndexed(exercise.answer) { idx, block ->
-                    ExerciseBlockItem(
-                        block = block,
-                        onOpenChapterSourceId = onOpenChapterSourceId,
-                        topPadding = if (idx == 0) 4.dp else 8.dp
+            // 4. 答案与解析具体内容（滑入/滑出展开收起动画）
+            item {
+                AnimatedVisibility(
+                    visible = isAnswerExpanded,
+                    enter = expandVertically(
+                        expandFrom = Alignment.Top,
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                    ) + fadeIn(
+                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                    ),
+                    exit = shrinkVertically(
+                        shrinkTowards = Alignment.Top,
+                        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing)
+                    ) + fadeOut(
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
                     )
+                ) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        exercise.answer.forEachIndexed { idx, block ->
+                            ExerciseBlockItem(
+                                block = block,
+                                onOpenChapterSourceId = onOpenChapterSourceId,
+                                topPadding = if (idx == 0) 6.dp else 8.dp
+                            )
+                        }
+                    }
                 }
             }
 
