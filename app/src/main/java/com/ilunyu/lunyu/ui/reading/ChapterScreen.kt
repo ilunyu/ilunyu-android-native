@@ -4,10 +4,15 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.ui.graphics.lerp
+import kotlinx.coroutines.Job
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -91,6 +96,8 @@ fun ChapterScreen(
     val coroutineScope = rememberCoroutineScope()
     var isCopied by remember { mutableStateOf(false) }
     var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
+    val highlightProgress = remember(chapter.id) { Animatable(0f) }
+    var highlightJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(isCopied) {
         if (isCopied) {
@@ -117,6 +124,10 @@ fun ChapterScreen(
     var previousChapterId by remember { mutableStateOf(chapter.id) }
     // 切换章节时重置滚动位置并完全展开顶栏
     LaunchedEffect(chapter.id) {
+        highlightJob?.cancel()
+        highlightJob = null
+        highlightedAnnotationIndex = null
+        highlightProgress.snapTo(0f)
         if (chapter.id != previousChapterId) {
             previousChapterId = chapter.id
             scrollState.expand()
@@ -192,13 +203,20 @@ fun ChapterScreen(
                         rawText = rawOrPlain,
                         primaryColor = MaterialTheme.colorScheme.primary,
                         onAnnotationClick = { noteNum ->
-                            highlightedAnnotationIndex = noteNum
-                            val noteIdx = chapter.annotations.indexOfFirst { it.index == noteNum }
-                            if (noteIdx >= 0) {
-                                coroutineScope.launch {
+                            highlightJob?.cancel()
+                            highlightJob = coroutineScope.launch {
+                                highlightedAnnotationIndex = noteNum
+                                highlightProgress.snapTo(1f)
+                                val noteIdx = chapter.annotations.indexOfFirst { it.index == noteNum }
+                                if (noteIdx >= 0) {
                                     delay(80)
                                     lazyListState.animateScrollToItem(3 + noteIdx)
                                 }
+                                highlightProgress.animateTo(
+                                    targetValue = 0f,
+                                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing)
+                                )
+                                highlightedAnnotationIndex = null
                             }
                         }
                     )
@@ -273,7 +291,18 @@ fun ChapterScreen(
 
             if (chapter.annotations.isNotEmpty()) {
                 itemsIndexed(chapter.annotations, key = { _, note -> "note_${note.index}" }) { idx, note ->
-                    val isHighlighted = highlightedAnnotationIndex == note.index
+                    val isCurrentTarget = highlightedAnnotationIndex == note.index
+                    val progress = if (isCurrentTarget) highlightProgress.value else 0f
+                    val badgeBgColor = lerp(
+                        MaterialTheme.colorScheme.secondaryContainer,
+                        MaterialTheme.colorScheme.primary,
+                        progress
+                    )
+                    val badgeTextColor = lerp(
+                        MaterialTheme.colorScheme.onSecondaryContainer,
+                        MaterialTheme.colorScheme.onPrimary,
+                        progress
+                    )
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -284,21 +313,20 @@ fun ChapterScreen(
                             ),
                         verticalAlignment = Alignment.Top
                     ) {
-                        // 圆形序号徽标：点击返回原文，高亮时显式突出，水波纹严格呈圆形
+                        // 圆形序号徽标：点击返回原文，无需加高亮，水波纹严格呈圆形
                         Surface(
                             onClick = {
-                                highlightedAnnotationIndex = note.index
+                                highlightJob?.cancel()
+                                highlightJob = null
+                                highlightedAnnotationIndex = null
                                 coroutineScope.launch {
+                                    highlightProgress.snapTo(0f)
                                     delay(100)
                                     lazyListState.animateScrollToItem(0)
                                 }
                             },
                             shape = CircleShape,
-                            color = if (isHighlighted) {
-                                MaterialTheme.colorScheme.primary
-                            } else {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            },
+                            color = badgeBgColor,
                             modifier = Modifier.size(28.dp)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
@@ -307,11 +335,7 @@ fun ChapterScreen(
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = if (isHighlighted) {
-                                             MaterialTheme.colorScheme.onPrimary
-                                        } else {
-                                            MaterialTheme.colorScheme.onSecondaryContainer
-                                        }
+                                        color = badgeTextColor
                                     )
                                 )
                             }
