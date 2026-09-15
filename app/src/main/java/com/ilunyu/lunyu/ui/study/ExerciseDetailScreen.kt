@@ -210,11 +210,18 @@ fun ExerciseDetailScreen(
 
             // 2. 题目各 Block（材料卡片 _MaterialCard、题干等）
             itemsIndexed(exercise.question) { idx, block ->
+                val isLast = idx == exercise.question.size - 1
+                val nextBlock = if (!isLast) exercise.question[idx + 1] else null
+                val bottomPadding = when {
+                    isLast -> 0.dp
+                    block.isMaterial && nextBlock?.isMaterial == true -> 8.dp
+                    else -> 16.dp
+                }
                 ExerciseBlockItem(
                     block = block,
                     onOpenChapterSourceId = onOpenChapterSourceId,
-                    topPadding = 4.dp,
-                    bottomPadding = if (idx == exercise.question.size - 1) 0.dp else 4.dp
+                    topPadding = if (idx == 0) 4.dp else 0.dp,
+                    bottomPadding = bottomPadding
                 )
             }
 
@@ -277,11 +284,18 @@ fun ExerciseDetailScreen(
                 ) {
                     Column(modifier = Modifier.fillMaxWidth()) {
                         exercise.answer.forEachIndexed { idx, block ->
+                            val isLast = idx == exercise.answer.size - 1
+                            val nextBlock = if (!isLast) exercise.answer[idx + 1] else null
+                            val bottomPadding = when {
+                                isLast -> 0.dp
+                                block.isMaterial && nextBlock?.isMaterial == true -> 8.dp
+                                else -> 16.dp
+                            }
                             ExerciseBlockItem(
                                 block = block,
                                 onOpenChapterSourceId = onOpenChapterSourceId,
-                                topPadding = 4.dp,
-                                bottomPadding = if (idx == exercise.answer.size - 1) 0.dp else 4.dp
+                                topPadding = if (idx == 0) 4.dp else 0.dp,
+                                bottomPadding = bottomPadding
                             )
                         }
                     }
@@ -297,8 +311,8 @@ fun ExerciseDetailScreen(
 private fun ExerciseBlockItem(
     block: ExerciseBlock,
     onOpenChapterSourceId: ((Int) -> Unit)?,
-    topPadding: Dp = 4.dp,
-    bottomPadding: Dp = 4.dp
+    topPadding: Dp = 0.dp,
+    bottomPadding: Dp = 16.dp
 ) {
     if (block.isMaterial) {
         // 材料卡片（完全对齐 Flutter _MaterialCard）
