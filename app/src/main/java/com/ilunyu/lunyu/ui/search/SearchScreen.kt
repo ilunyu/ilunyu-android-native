@@ -30,8 +30,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -107,6 +109,15 @@ fun SearchScreen(
     }
     LaunchedEffect(exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset) {
         onSaveScroll(true, exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset)
+    }
+
+    var previousQuery by rememberSaveable { mutableStateOf(query) }
+    LaunchedEffect(query) {
+        if (query != previousQuery) {
+            previousQuery = query
+            chapterListState.scrollToItem(0, 0)
+            exerciseListState.scrollToItem(0, 0)
+        }
     }
 
     val queryTrimmed = query.trim()
@@ -287,7 +298,7 @@ fun SearchScreen(
                                     )
                                 }
 
-                                itemsIndexed(matchingChapters) { index, (pian, chapter) ->
+                                itemsIndexed(matchingChapters, key = { _, pair -> pair.second.id }) { index, (pian, chapter) ->
                                     val isFav = favoriteChapterIds.contains(chapter.id)
                                     PianChapterRow(
                                         chapter = chapter,
@@ -338,7 +349,7 @@ fun SearchScreen(
                                     )
                                 }
 
-                                itemsIndexed(matchingExercises) { index, exercise ->
+                                itemsIndexed(matchingExercises, key = { _, exercise -> exercise.id }) { index, exercise ->
                                     val isFav = favoriteExerciseIds.contains(exercise.id)
                                     ExerciseListRow(
                                         exercise = exercise,

@@ -123,7 +123,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun setSearchQuery(query: String) {
-        _searchQuery.value = query
+        if (_searchQuery.value != query) {
+            _searchQuery.value = query
+            _chapterScrollIndex.value = 0
+            _chapterScrollOffset.value = 0
+            _exerciseScrollIndex.value = 0
+            _exerciseScrollOffset.value = 0
+        }
     }
 
     fun setSearchTab(tab: Int) {
