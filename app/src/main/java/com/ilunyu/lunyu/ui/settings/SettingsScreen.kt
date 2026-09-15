@@ -61,6 +61,9 @@ import com.ilunyu.lunyu.data.model.AppFontPreference
 import com.ilunyu.lunyu.data.model.AppThemeMode
 import com.ilunyu.lunyu.ui.theme.getFontFamily
 
+import androidx.compose.material.icons.outlined.Quiz
+import androidx.compose.material3.Switch
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
@@ -68,6 +71,8 @@ fun SettingsScreen(
     currentFontPreference: AppFontPreference,
     onThemeModeChanged: (AppThemeMode) -> Unit,
     onFontPreferenceChanged: (AppFontPreference) -> Unit,
+    defaultAnswerExpanded: Boolean = true,
+    onDefaultAnswerExpandedChanged: (Boolean) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -229,6 +234,38 @@ fun SettingsScreen(
                     )
                 }
                 Spacer(modifier = Modifier.height(20.dp))
+            }
+
+            // 全宽分割线
+            item {
+                HorizontalDivider(
+                    thickness = 1.dp,
+                    color = MaterialTheme.colorScheme.outlineVariant
+                )
+            }
+
+            // 学习小标题
+            item {
+                Text(
+                    text = "学习",
+                    style = MaterialTheme.typography.titleSmall.copy(
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    ),
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
+                )
+            }
+
+            // 答案与解析展开/收起设置
+            item {
+                SettingSwitchItem(
+                    icon = Icons.Outlined.Quiz,
+                    title = "默认展开答案与解析",
+                    subtitle = if (defaultAnswerExpanded) "进入题目时自动展示答案与解析" else "进入题目时默认收起答案与解析",
+                    checked = defaultAnswerExpanded,
+                    onCheckedChange = onDefaultAnswerExpandedChanged
+                )
+                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // 全宽分割线
@@ -502,6 +539,53 @@ private fun SettingListItem(
             contentDescription = null,
             modifier = Modifier.size(20.dp),
             tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+private fun SettingSwitchItem(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(horizontal = 24.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontWeight = FontWeight.Normal,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
         )
     }
 }

@@ -47,6 +47,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.ExerciseBlock
@@ -57,6 +66,7 @@ fun ExerciseDetailScreen(
     exercise: Exercise,
     isFavorite: Boolean,
     onToggleFavorite: () -> Unit,
+    defaultAnswerExpanded: Boolean = true,
     onOpenChapterSourceId: ((Int) -> Unit)? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -68,6 +78,15 @@ fun ExerciseDetailScreen(
             lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
         }
     }
+
+    var isAnswerExpanded by remember(exercise.id, defaultAnswerExpanded) {
+        mutableStateOf(defaultAnswerExpanded)
+    }
+    val arrowRotation by animateFloatAsState(
+        targetValue = if (isAnswerExpanded) 180f else 0f,
+        animationSpec = tween(durationMillis = 250, easing = FastOutSlowInEasing),
+        label = "answerArrowRotation"
+    )
 
     // 切换试题时重置滚动位置并完全展开顶栏
     LaunchedEffect(exercise.id) {
@@ -172,20 +191,29 @@ fun ExerciseDetailScreen(
             }
 
             // 2. 题目各 Block（材料卡片 _MaterialCard、题干等）
-            items(exercise.question) { block ->
+            itemsIndexed(exercise.question) { idx, block ->
                 ExerciseBlockItem(
                     block = block,
-                    onOpenChapterSourceId = onOpenChapterSourceId
+                    onOpenChapterSourceId = onOpenChapterSourceId,
+                    bottomPadding = if (idx == exercise.question.size - 1) 0.dp else 8.dp
                 )
             }
 
-
-            // 3. 答案与解析标题 (对齐 Flutter 规范直接陈列)
+            // 原文与答案之间留出 48dp 留白（40dp spacer + 8dp row padding = 48dp）
             item {
-                Column(
+                Spacer(modifier = Modifier.height(40.dp))
+            }
+
+            // 3. 答案与解析标题（整行可点按，最右侧带指示展开/收起的箭头）
+            item {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 10.dp)
+                        .padding(horizontal = 16.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { isAnswerExpanded = !isAnswerExpanded }
+                        .padding(horizontal = 8.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
                         text = "答案与解析",
@@ -193,17 +221,28 @@ fun ExerciseDetailScreen(
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
-                        )
+                        ),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Icon(
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isAnswerExpanded) "收起答案与解析" else "展开答案与解析",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .rotate(arrowRotation)
                     )
                 }
             }
 
-            // 4. 答案与解析内容
-            items(exercise.answer) { block ->
-                ExerciseBlockItem(
-                    block = block,
-                    onOpenChapterSourceId = onOpenChapterSourceId
-                )
+            // 4. 答案与解析具体内容（收起/展开）
+            if (isAnswerExpanded) {
+                items(exercise.answer) { block ->
+                    ExerciseBlockItem(
+                        block = block,
+                        onOpenChapterSourceId = onOpenChapterSourceId
+                    )
+                }
             }
 
             item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -211,12 +250,12 @@ fun ExerciseDetailScreen(
     }
 }
 
-
-
 @Composable
 private fun ExerciseBlockItem(
     block: ExerciseBlock,
-    onOpenChapterSourceId: ((Int) -> Unit)?
+    onOpenChapterSourceId: ((Int) -> Unit)?,
+    topPadding: Dp = 8.dp,
+    bottomPadding: Dp = 8.dp
 ) {
     if (block.isMaterial) {
         // 材料卡片（完全对齐 Flutter _MaterialCard）
@@ -227,7 +266,7 @@ private fun ExerciseBlockItem(
         )
         val cardModifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 24.dp, vertical = 8.dp)
+            .padding(start = 24.dp, end = 24.dp, top = topPadding, bottom = bottomPadding)
 
         val cardContent = @Composable {
             Column(
@@ -253,8 +292,8 @@ private fun ExerciseBlockItem(
                         Text(
                             text = p.text,
                             style = MaterialTheme.typography.bodyMedium.copy(
-                                fontSize = 15.sp,
-                                lineHeight = 26.sp,
+                                fontSize = 16.sp,
+                                lineHeight = 28.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                         )
@@ -263,8 +302,8 @@ private fun ExerciseBlockItem(
                     Text(
                         text = block.text,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 26.sp,
+                            fontSize = 16.sp,
+                            lineHeight = 28.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -324,13 +363,13 @@ private fun ExerciseBlockItem(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp, vertical = 8.dp)
+                .padding(start = 24.dp, end = 24.dp, top = topPadding, bottom = bottomPadding)
         ) {
             if (block.blocktitle.isNotBlank()) {
                 Text(
                     text = block.blocktitle,
                     style = MaterialTheme.typography.titleSmall.copy(
-                        fontSize = 15.sp,
+                        fontSize = 16.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -344,8 +383,8 @@ private fun ExerciseBlockItem(
                     Text(
                         text = p.text,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontSize = 15.sp,
-                            lineHeight = 26.sp,
+                            fontSize = 16.sp,
+                            lineHeight = 28.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                     )
@@ -354,8 +393,8 @@ private fun ExerciseBlockItem(
                 Text(
                     text = block.text,
                     style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 15.sp,
-                        lineHeight = 26.sp,
+                        fontSize = 16.sp,
+                        lineHeight = 28.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )

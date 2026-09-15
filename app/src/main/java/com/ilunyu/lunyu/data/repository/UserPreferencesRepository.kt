@@ -3,6 +3,7 @@ package com.ilunyu.lunyu.data.repository
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -21,6 +22,7 @@ class UserPreferencesRepository(private val context: Context) {
         val FONT_PREFERENCE = stringPreferencesKey("font_preference")
         val FAVORITE_CHAPTERS = stringSetPreferencesKey("favorite_chapters")
         val FAVORITE_EXERCISES = stringSetPreferencesKey("favorite_exercises")
+        val DEFAULT_ANSWER_EXPANDED = booleanPreferencesKey("default_answer_expanded")
     }
 
     val themeModeFlow: Flow<AppThemeMode> = context.dataStore.data.map { preferences ->
@@ -37,6 +39,16 @@ class UserPreferencesRepository(private val context: Context) {
 
     val favoriteExercisesFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
         preferences[PreferencesKeys.FAVORITE_EXERCISES] ?: emptySet()
+    }
+
+    val defaultAnswerExpandedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
+        preferences[PreferencesKeys.DEFAULT_ANSWER_EXPANDED] ?: true
+    }
+
+    suspend fun setDefaultAnswerExpanded(expanded: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[PreferencesKeys.DEFAULT_ANSWER_EXPANDED] = expanded
+        }
     }
 
     suspend fun setThemeMode(mode: AppThemeMode) {

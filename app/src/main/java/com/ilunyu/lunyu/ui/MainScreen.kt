@@ -72,6 +72,7 @@ fun MainScreen(
     val fontPreference by viewModel.fontPreference.collectAsState()
     val favoriteChapters by viewModel.favoriteChapters.collectAsState()
     val favoriteExercises by viewModel.favoriteExercises.collectAsState()
+    val defaultAnswerExpanded by viewModel.defaultAnswerExpanded.collectAsState()
     val library by viewModel.library.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
 
@@ -354,7 +355,9 @@ fun MainScreen(
                                 currentThemeMode = themeMode,
                                 currentFontPreference = fontPreference,
                                 onThemeModeChanged = { viewModel.setThemeMode(it) },
-                                onFontPreferenceChanged = { viewModel.setFontPreference(it) }
+                                onFontPreferenceChanged = { viewModel.setFontPreference(it) },
+                                defaultAnswerExpanded = defaultAnswerExpanded,
+                                onDefaultAnswerExpandedChanged = { viewModel.setDefaultAnswerExpanded(it) }
                             )
                         }
                     }
@@ -403,6 +406,7 @@ fun MainScreen(
                                 exercise = exercise,
                                 isFavorite = favoriteExercises.contains(exercise.id),
                                 onToggleFavorite = { viewModel.toggleExerciseFavorite(exercise.id) },
+                                defaultAnswerExpanded = defaultAnswerExpanded,
                                 onOpenChapterSourceId = { sourceId ->
                                     coroutineScope.launch {
                                         val target = viewModel.getChapterById("$sourceId")

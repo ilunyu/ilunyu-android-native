@@ -36,6 +36,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val favoriteExercises: StateFlow<Set<String>> = userPrefs.favoriteExercisesFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptySet())
 
+    val defaultAnswerExpanded: StateFlow<Boolean> = userPrefs.defaultAnswerExpandedFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
     private val _library = MutableStateFlow<AnalectsLibrary?>(null)
     val library: StateFlow<AnalectsLibrary?> = _library.asStateFlow()
 
@@ -48,6 +51,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         viewModelScope.launch {
             _exercises.value = exerciseRepo.getExerciseList()
+        }
+    }
+
+    fun setDefaultAnswerExpanded(expanded: Boolean) {
+        viewModelScope.launch {
+            userPrefs.setDefaultAnswerExpanded(expanded)
         }
     }
 
