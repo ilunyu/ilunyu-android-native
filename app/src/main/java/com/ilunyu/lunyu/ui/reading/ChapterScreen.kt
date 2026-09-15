@@ -78,6 +78,9 @@ fun ChapterScreen(
     prevChapter: Pair<Pian, Chapter>?,
     nextChapter: Pair<Pian, Chapter>?,
     isFavorite: Boolean,
+    scrollIndex: Int = 0,
+    scrollOffset: Int = 0,
+    onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
     onToggleFavorite: () -> Unit,
     onNavigateToChapter: (String, Int) -> Unit,
     onNavigateToExercise: (String) -> Unit = {},
@@ -96,7 +99,14 @@ fun ChapterScreen(
         }
     }
 
-    val lazyListState = rememberLazyListState()
+    val lazyListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = scrollIndex,
+        initialFirstVisibleItemScrollOffset = scrollOffset
+    )
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+    }
+
     val scrollState = rememberLunyuTopBarScrollState()
     val isScrolledUnder by remember {
         derivedStateOf {
@@ -104,10 +114,14 @@ fun ChapterScreen(
         }
     }
 
+    var previousChapterId by remember { mutableStateOf(chapter.id) }
     // 切换章节时重置滚动位置并完全展开顶栏
     LaunchedEffect(chapter.id) {
-        scrollState.expand()
-        lazyListState.scrollToItem(0)
+        if (chapter.id != previousChapterId) {
+            previousChapterId = chapter.id
+            scrollState.expand()
+            lazyListState.scrollToItem(0)
+        }
     }
 
     // 列表滚动回最顶部时，保证顶栏完全展开

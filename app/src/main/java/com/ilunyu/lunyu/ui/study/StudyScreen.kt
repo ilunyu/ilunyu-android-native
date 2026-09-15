@@ -27,10 +27,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
@@ -43,16 +46,21 @@ import com.ilunyu.lunyu.data.model.Exercise
 fun StudyScreen(
     exercises: List<Exercise>,
     favoriteExerciseIds: Set<String>,
+    selectedYears: Set<String> = emptySet(),
+    selectedSources: Set<String> = emptySet(),
+    selectedGrades: Set<Int> = emptySet(),
+    selectedTypes: Set<String> = emptySet(),
+    onUpdateFilters: (Set<String>, Set<String>, Set<Int>, Set<String>) -> Unit = { _, _, _, _ -> },
+    scrollIndex: Int = 0,
+    scrollOffset: Int = 0,
+    onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
     onToggleExerciseFavorite: (String) -> Unit,
     onNavigateToExercise: (String) -> Unit,
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showFilterDialog by remember { mutableStateOf(false) }
-    var selectedYears by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedSources by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedGrades by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    var selectedTypes by remember { mutableStateOf<Set<String>>(emptySet()) }
+    val coroutineScope = rememberCoroutineScope()
 
     val hasActiveFilters = selectedYears.isNotEmpty() ||
             selectedSources.isNotEmpty() ||
@@ -82,7 +90,15 @@ fun StudyScreen(
         )
     }
 
-    val lazyListState = rememberLazyListState()
+    val lazyListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = scrollIndex,
+        initialFirstVisibleItemScrollOffset = scrollOffset
+    )
+
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+    }
+
     val isScrolledUnder by remember {
         derivedStateOf {
             lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
@@ -152,7 +168,10 @@ fun StudyScreen(
                     )
                 }
 
-                itemsIndexed(filteredExercises) { index, exercise ->
+                itemsIndexed(
+                    items = filteredExercises,
+                    key = { _, exercise -> exercise.id }
+                ) { index, exercise ->
                     val isFav = favoriteExerciseIds.contains(exercise.id)
                     ExerciseListRow(
                         exercise = exercise,
@@ -180,11 +199,11 @@ fun StudyScreen(
             initialTypes = selectedTypes,
             onDismiss = { showFilterDialog = false },
             onApply = { years, sources, grades, types ->
-                selectedYears = years
-                selectedSources = sources
-                selectedGrades = grades
-                selectedTypes = types
+                onUpdateFilters(years, sources, grades, types)
                 showFilterDialog = false
+                coroutineScope.launch {
+                    lazyListState.scrollToItem(0, 0)
+                }
             }
         )
     }

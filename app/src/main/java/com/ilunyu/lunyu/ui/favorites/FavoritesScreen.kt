@@ -22,6 +22,8 @@ import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTabLayout
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -62,6 +64,20 @@ fun FavoritesScreen(
     favoriteExerciseIds: Set<String>,
     allPians: List<Pian>,
     allExercises: List<Exercise>,
+    selectedTab: Int = 0,
+    onTabChange: (Int) -> Unit = {},
+    sortMode: FavoritesSortMode = FavoritesSortMode.DEFAULT,
+    onUpdateSortMode: (FavoritesSortMode) -> Unit = {},
+    selectedYears: Set<String> = emptySet(),
+    selectedSources: Set<String> = emptySet(),
+    selectedGrades: Set<Int> = emptySet(),
+    selectedTypes: Set<String> = emptySet(),
+    onUpdateExerciseFilters: (Set<String>, Set<String>, Set<Int>, Set<String>) -> Unit = { _, _, _, _ -> },
+    chapterScrollIndex: Int = 0,
+    chapterScrollOffset: Int = 0,
+    exerciseScrollIndex: Int = 0,
+    exerciseScrollOffset: Int = 0,
+    onSaveScroll: (Boolean, Int, Int) -> Unit = { _, _, _ -> },
     onToggleChapterFavorite: (String) -> Unit,
     onToggleExerciseFavorite: (String) -> Unit,
     onNavigateToChapter: (String, Int) -> Unit,
@@ -69,16 +85,18 @@ fun FavoritesScreen(
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    val pagerState = rememberPagerState(
+        initialPage = selectedTab,
+        pageCount = { 2 }
+    )
     val coroutineScope = rememberCoroutineScope()
-    var sortMode by remember { mutableStateOf(FavoritesSortMode.DEFAULT) }
+
+    LaunchedEffect(pagerState.currentPage) {
+        onTabChange(pagerState.currentPage)
+    }
 
     // 试题筛选状态
     var showFilterDialog by remember { mutableStateOf(false) }
-    var selectedYears by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedSources by remember { mutableStateOf<Set<String>>(emptySet()) }
-    var selectedGrades by remember { mutableStateOf<Set<Int>>(emptySet()) }
-    var selectedTypes by remember { mutableStateOf<Set<String>>(emptySet()) }
 
     val hasActiveExerciseFilters = selectedYears.isNotEmpty() ||
             selectedSources.isNotEmpty() ||
@@ -130,6 +148,23 @@ fun FavoritesScreen(
         }
     }
 
+    val chapterListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = chapterScrollIndex,
+        initialFirstVisibleItemScrollOffset = chapterScrollOffset
+    )
+    val exerciseListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = exerciseScrollIndex,
+        initialFirstVisibleItemScrollOffset = exerciseScrollOffset
+    )
+
+    LaunchedEffect(chapterListState.firstVisibleItemIndex, chapterListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(false, chapterListState.firstVisibleItemIndex, chapterListState.firstVisibleItemScrollOffset)
+    }
+
+    LaunchedEffect(exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(true, exerciseListState.firstVisibleItemIndex, exerciseListState.firstVisibleItemScrollOffset)
+    }
+
     val scrollState = rememberLunyuTopBarScrollState()
 
     LunyuCollapsibleTabLayout(
@@ -144,10 +179,15 @@ fun FavoritesScreen(
                         // 排序按钮（最左侧）
                         IconButton(
                             onClick = {
-                                sortMode = when (sortMode) {
+                                val nextMode = when (sortMode) {
                                     FavoritesSortMode.DEFAULT -> FavoritesSortMode.NEWEST_FIRST
                                     FavoritesSortMode.NEWEST_FIRST -> FavoritesSortMode.OLDEST_FIRST
                                     FavoritesSortMode.OLDEST_FIRST -> FavoritesSortMode.DEFAULT
+                                }
+                                onUpdateSortMode(nextMode)
+                                coroutineScope.launch {
+                                    chapterListState.scrollToItem(0, 0)
+                                    exerciseListState.scrollToItem(0, 0)
                                 }
                             }
                         ) {
@@ -216,7 +256,10 @@ fun FavoritesScreen(
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = chapterListState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                             item {
                                 Text(
                                     text = "共 ${favoriteChapters.size} 章",
@@ -228,7 +271,10 @@ fun FavoritesScreen(
                                 )
                             }
 
-                            itemsIndexed(favoriteChapters) { index, (pian, chapter) ->
+                            itemsIndexed(
+                                items = favoriteChapters,
+                                key = { _, pair -> pair.second.id }
+                            ) { index, (pian, chapter) ->
                                 PianChapterRow(
                                     chapter = chapter,
                                     isFavorite = true,
@@ -257,7 +303,10 @@ fun FavoritesScreen(
                             )
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                        LazyColumn(
+                            state = exerciseListState,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                             item {
                                 Text(
                                     text = "共 ${favoriteExercises.size} 题",
@@ -269,7 +318,10 @@ fun FavoritesScreen(
                                 )
                             }
 
-                            itemsIndexed(favoriteExercises) { index, exercise ->
+                            itemsIndexed(
+                                items = favoriteExercises,
+                                key = { _, exercise -> exercise.id }
+                            ) { index, exercise ->
                                 val isFav = favoriteExerciseIds.contains(exercise.id)
                                 ExerciseListRow(
                                     exercise = exercise,
@@ -299,11 +351,11 @@ fun FavoritesScreen(
             initialTypes = selectedTypes,
             onDismiss = { showFilterDialog = false },
             onApply = { years, sources, grades, types ->
-                selectedYears = years
-                selectedSources = sources
-                selectedGrades = grades
-                selectedTypes = types
+                onUpdateExerciseFilters(years, sources, grades, types)
                 showFilterDialog = false
+                coroutineScope.launch {
+                    exerciseListState.scrollToItem(0, 0)
+                }
             }
         )
     }

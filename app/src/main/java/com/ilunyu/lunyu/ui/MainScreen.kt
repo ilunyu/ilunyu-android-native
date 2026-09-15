@@ -76,7 +76,32 @@ fun MainScreen(
     val library by viewModel.library.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
 
-    var activePianSlug by remember { mutableStateOf<String?>(null) }
+    val activePianSlug by viewModel.activePianSlug.collectAsState()
+    val pianScrollMap by viewModel.pianScrollMap.collectAsState()
+    val catalogScrollIndex by viewModel.catalogScrollIndex.collectAsState()
+    val catalogScrollOffset by viewModel.catalogScrollOffset.collectAsState()
+
+    val studyYears by viewModel.studyYears.collectAsState()
+    val studySources by viewModel.studySources.collectAsState()
+    val studyGrades by viewModel.studyGrades.collectAsState()
+    val studyTypes by viewModel.studyTypes.collectAsState()
+    val studyScrollIndex by viewModel.studyScrollIndex.collectAsState()
+    val studyScrollOffset by viewModel.studyScrollOffset.collectAsState()
+
+    val favoritesTab by viewModel.favoritesTab.collectAsState()
+    val favoritesSortMode by viewModel.favoritesSortMode.collectAsState()
+    val favoritesYears by viewModel.favoritesYears.collectAsState()
+    val favoritesSources by viewModel.favoritesSources.collectAsState()
+    val favoritesGrades by viewModel.favoritesGrades.collectAsState()
+    val favoritesTypes by viewModel.favoritesTypes.collectAsState()
+    val favoritesChapterScrollIndex by viewModel.favoritesChapterScrollIndex.collectAsState()
+    val favoritesChapterScrollOffset by viewModel.favoritesChapterScrollOffset.collectAsState()
+    val favoritesExerciseScrollIndex by viewModel.favoritesExerciseScrollIndex.collectAsState()
+    val favoritesExerciseScrollOffset by viewModel.favoritesExerciseScrollOffset.collectAsState()
+
+    val chapterDetailScrollMap by viewModel.chapterDetailScrollMap.collectAsState()
+    val exerciseDetailScrollMap by viewModel.exerciseDetailScrollMap.collectAsState()
+
     var destinationStack by remember { mutableStateOf(listOf<ScreenDestination>(ScreenDestination.Tab(0))) }
     var isNavigatingBack by remember { mutableStateOf(false) }
     val currentDestination = destinationStack.last()
@@ -131,7 +156,7 @@ fun MainScreen(
                         onClick = {
                             if (currentTab == 0 && (activePianSlug != null || currentDestination is ScreenDestination.ChapterDetail)) {
                                 // 在阅读页再次点击阅读 Tab：重置回篇目总览网格（完全对齐 Flutter _openCatalogPage）
-                                activePianSlug = null
+                                viewModel.setActivePianSlug(null)
                             }
                             isNavigatingBack = false
                             destinationStack = listOf(ScreenDestination.Tab(0))
@@ -314,11 +339,20 @@ fun MainScreen(
                             0 -> ReadingScreen(
                                 library = library,
                                 activePianSlug = activePianSlug,
-                                onActivePianChanged = { activePianSlug = it },
+                                onActivePianChanged = { viewModel.setActivePianSlug(it) },
                                 favoriteChapterIds = favoriteChapters,
+                                pianScrollMap = pianScrollMap,
+                                onSavePianScroll = { slug, index, offset ->
+                                    viewModel.savePianScroll(slug, index, offset)
+                                },
+                                catalogScrollIndex = catalogScrollIndex,
+                                catalogScrollOffset = catalogScrollOffset,
+                                onSaveCatalogScroll = { index, offset ->
+                                    viewModel.saveCatalogScroll(index, offset)
+                                },
                                 onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                                 onNavigateToChapter = { slug, number ->
-                                    activePianSlug = slug
+                                    viewModel.setActivePianSlug(slug)
                                     navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToSearch = {
@@ -330,6 +364,18 @@ fun MainScreen(
                             1 -> StudyScreen(
                                 exercises = exercises,
                                 favoriteExerciseIds = favoriteExercises,
+                                selectedYears = studyYears,
+                                selectedSources = studySources,
+                                selectedGrades = studyGrades,
+                                selectedTypes = studyTypes,
+                                onUpdateFilters = { years, sources, grades, types ->
+                                    viewModel.setStudyFilters(years, sources, grades, types)
+                                },
+                                scrollIndex = studyScrollIndex,
+                                scrollOffset = studyScrollOffset,
+                                onSaveScroll = { index, offset ->
+                                    viewModel.saveStudyScroll(index, offset)
+                                },
                                 onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                                 onNavigateToExercise = { exerciseId ->
                                     navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
@@ -345,10 +391,28 @@ fun MainScreen(
                                 favoriteExerciseIds = favoriteExercises,
                                 allPians = library?.pians ?: emptyList(),
                                 allExercises = exercises,
+                                selectedTab = favoritesTab,
+                                onTabChange = { viewModel.setFavoritesTab(it) },
+                                sortMode = favoritesSortMode,
+                                onUpdateSortMode = { viewModel.setFavoritesSortMode(it) },
+                                selectedYears = favoritesYears,
+                                selectedSources = favoritesSources,
+                                selectedGrades = favoritesGrades,
+                                selectedTypes = favoritesTypes,
+                                onUpdateExerciseFilters = { years, sources, grades, types ->
+                                    viewModel.setFavoritesExerciseFilters(years, sources, grades, types)
+                                },
+                                chapterScrollIndex = favoritesChapterScrollIndex,
+                                chapterScrollOffset = favoritesChapterScrollOffset,
+                                exerciseScrollIndex = favoritesExerciseScrollIndex,
+                                exerciseScrollOffset = favoritesExerciseScrollOffset,
+                                onSaveScroll = { isExercise, index, offset ->
+                                    viewModel.saveFavoritesScroll(isExercise, index, offset)
+                                },
                                 onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                                 onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                                 onNavigateToChapter = { slug, number ->
-                                    activePianSlug = slug
+                                    viewModel.setActivePianSlug(slug)
                                     navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToExercise = { exerciseId ->
@@ -381,15 +445,21 @@ fun MainScreen(
                         val data = chapterData
                         if (data != null) {
                             val (pian, chapter) = data
+                            val scrollPair = chapterDetailScrollMap[chapter.id]
                             ChapterScreen(
                                 pian = pian,
                                 chapter = chapter,
                                 prevChapter = adjacentChapters.first,
                                 nextChapter = adjacentChapters.second,
                                 isFavorite = favoriteChapters.contains(chapter.id),
+                                scrollIndex = scrollPair?.first ?: 0,
+                                scrollOffset = scrollPair?.second ?: 0,
+                                onSaveScroll = { idx, off ->
+                                    viewModel.saveChapterDetailScroll(chapter.id, idx, off)
+                                },
                                 onToggleFavorite = { viewModel.toggleChapterFavorite(chapter.id) },
                                 onNavigateToChapter = { slug, number ->
-                                    activePianSlug = slug
+                                    viewModel.setActivePianSlug(slug)
                                     replaceTop(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToExercise = { exerciseId ->
@@ -411,16 +481,22 @@ fun MainScreen(
                         }
                         val exercise = exerciseData
                         if (exercise != null) {
+                            val scrollPair = exerciseDetailScrollMap[exercise.id]
                             ExerciseDetailScreen(
                                 exercise = exercise,
                                 isFavorite = favoriteExercises.contains(exercise.id),
+                                scrollIndex = scrollPair?.first ?: 0,
+                                scrollOffset = scrollPair?.second ?: 0,
+                                onSaveScroll = { idx, off ->
+                                    viewModel.saveExerciseDetailScroll(exercise.id, idx, off)
+                                },
                                 onToggleFavorite = { viewModel.toggleExerciseFavorite(exercise.id) },
                                 defaultAnswerExpanded = defaultAnswerExpanded,
                                 onOpenChapterSourceId = { sourceId ->
                                     coroutineScope.launch {
                                         val target = viewModel.getChapterById("$sourceId")
                                         if (target != null) {
-                                            activePianSlug = target.first.slug
+                                            viewModel.setActivePianSlug(target.first.slug)
                                             navigateTo(ScreenDestination.ChapterDetail(target.first.slug, target.second.number))
                                         }
                                     }
@@ -463,7 +539,7 @@ fun MainScreen(
                             onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                             onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                             onNavigateToChapter = { slug, number ->
-                                activePianSlug = slug
+                                viewModel.setActivePianSlug(slug)
                                 navigateTo(ScreenDestination.ChapterDetail(slug, number))
                             },
                             onNavigateToExercise = { exerciseId ->

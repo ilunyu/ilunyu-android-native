@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -67,6 +68,11 @@ fun ReadingScreen(
     activePianSlug: String?,
     onActivePianChanged: (String?) -> Unit,
     favoriteChapterIds: Set<String>,
+    pianScrollMap: Map<String, Pair<Int, Int>> = emptyMap(),
+    onSavePianScroll: (String, Int, Int) -> Unit = { _, _, _ -> },
+    catalogScrollIndex: Int = 0,
+    catalogScrollOffset: Int = 0,
+    onSaveCatalogScroll: (Int, Int) -> Unit = { _, _ -> },
     onToggleChapterFavorite: (String) -> Unit,
     onNavigateToChapter: (String, Int) -> Unit,
     onNavigateToSearch: () -> Unit,
@@ -108,7 +114,13 @@ fun ReadingScreen(
     ) { isOverview ->
         if (isOverview) {
             // 1. 篇目总览网格视图（完全对齐 Flutter _CatalogPage）
-            val catalogGridState = rememberLazyGridState()
+            val catalogGridState = rememberLazyGridState(
+                initialFirstVisibleItemIndex = catalogScrollIndex,
+                initialFirstVisibleItemScrollOffset = catalogScrollOffset
+            )
+            LaunchedEffect(catalogGridState.firstVisibleItemIndex, catalogGridState.firstVisibleItemScrollOffset) {
+                onSaveCatalogScroll(catalogGridState.firstVisibleItemIndex, catalogGridState.firstVisibleItemScrollOffset)
+            }
             val isCatalogScrolledUnder by remember {
                 derivedStateOf {
                     catalogGridState.firstVisibleItemIndex > 0 || catalogGridState.firstVisibleItemScrollOffset > 0
@@ -220,7 +232,19 @@ fun ReadingScreen(
                     val prevPian = if (page > 0) pians[page - 1] else null
                     val nextPian = if (page < pians.size - 1) pians[page + 1] else null
 
-                    LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    val pianScroll = pianScrollMap[currentPian.slug]
+                    val lazyListState = rememberLazyListState(
+                        initialFirstVisibleItemIndex = pianScroll?.first ?: 0,
+                        initialFirstVisibleItemScrollOffset = pianScroll?.second ?: 0
+                    )
+                    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+                        onSavePianScroll(currentPian.slug, lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+                    }
+
+                    LazyColumn(
+                        state = lazyListState,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                         item {
                             Column(
                                 modifier = Modifier.padding(
@@ -250,7 +274,10 @@ fun ReadingScreen(
                             }
                         }
 
-                        itemsIndexed(currentPian.chapters) { index, chapter ->
+                        itemsIndexed(
+                            items = currentPian.chapters,
+                            key = { _, chapter -> chapter.id }
+                        ) { index, chapter ->
                             val isFav = favoriteChapterIds.contains(chapter.id)
                             PianChapterRow(
                                 chapter = chapter,

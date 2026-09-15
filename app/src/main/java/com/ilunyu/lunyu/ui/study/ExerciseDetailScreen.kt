@@ -83,13 +83,23 @@ import com.ilunyu.lunyu.data.model.ExerciseFormat
 fun ExerciseDetailScreen(
     exercise: Exercise,
     isFavorite: Boolean,
+    scrollIndex: Int = 0,
+    scrollOffset: Int = 0,
+    onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
     onToggleFavorite: () -> Unit,
     defaultAnswerExpanded: Boolean = true,
     onOpenChapterSourceId: ((Int) -> Unit)? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val lazyListState = rememberLazyListState()
+    val lazyListState = rememberLazyListState(
+        initialFirstVisibleItemIndex = scrollIndex,
+        initialFirstVisibleItemScrollOffset = scrollOffset
+    )
+    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
+        onSaveScroll(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+    }
+
     val scrollState = rememberLunyuTopBarScrollState()
     val isScrolledUnder by remember {
         derivedStateOf {
@@ -106,10 +116,14 @@ fun ExerciseDetailScreen(
         label = "answerArrowRotation"
     )
 
+    var previousExerciseId by remember { mutableStateOf(exercise.id) }
     // 切换试题时重置滚动位置并完全展开顶栏
     LaunchedEffect(exercise.id) {
-        scrollState.expand()
-        lazyListState.scrollToItem(0)
+        if (exercise.id != previousExerciseId) {
+            previousExerciseId = exercise.id
+            scrollState.expand()
+            lazyListState.scrollToItem(0)
+        }
     }
 
     // 列表滚动回最顶部时，保证顶栏完全展开
