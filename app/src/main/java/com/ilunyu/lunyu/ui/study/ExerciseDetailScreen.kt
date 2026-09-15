@@ -29,8 +29,11 @@ import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material3.Card
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
+import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
+import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -59,49 +62,57 @@ fun ExerciseDetailScreen(
     modifier: Modifier = Modifier
 ) {
     val lazyListState = rememberLazyListState()
+    val scrollState = rememberLunyuTopBarScrollState()
     val isScrolledUnder by remember {
         derivedStateOf {
             lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
         }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.surface)
-            .statusBarsPadding()
-    ) {
-        LunyuTopBar(
-            showDivider = isScrolledUnder,
-            navigationIcon = {
-                IconButton(onClick = onBack) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "返回试题库"
-                    )
-                }
-            },
-            actions = {
-                IconButton(onClick = onToggleFavorite) {
-                    Icon(
-                        imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
-                        contentDescription = if (isFavorite) "取消收藏" else "收藏试题",
-                        tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                }
-                Spacer(modifier = Modifier.width(4.dp))
-            }
-        )
+    // 切换试题时重置滚动位置并完全展开顶栏
+    LaunchedEffect(exercise.id) {
+        scrollState.expand()
+        lazyListState.scrollToItem(0)
+    }
 
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
+    // 列表滚动回最顶部时，保证顶栏完全展开
+    LaunchedEffect(isScrolledUnder) {
+        if (!isScrolledUnder && !scrollState.isExpanded) {
+            scrollState.expand()
+        }
+    }
+
+    LunyuCollapsibleTopBarLayout(
+        scrollState = scrollState,
+        modifier = modifier.fillMaxSize(),
+        topBar = {
+            LunyuTopBar(
+                showDivider = isScrolledUnder,
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回试题库"
+                        )
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onToggleFavorite) {
+                        Icon(
+                            imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                            contentDescription = if (isFavorite) "取消收藏" else "收藏试题",
+                            tint = if (isFavorite) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+            )
+        }
+    ) {
+        LazyColumn(
+            state = lazyListState,
+            modifier = Modifier.fillMaxSize()
         ) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
             // 1. 标题与元数据（对齐 Flutter _ExerciseHeader）
             item {
                 Column(
@@ -195,10 +206,9 @@ fun ExerciseDetailScreen(
                 )
             }
 
-            item { Spacer(modifier = Modifier.height(48.dp)) }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
-}
 }
 
 
