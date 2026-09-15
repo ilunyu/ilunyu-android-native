@@ -212,9 +212,10 @@ fun ChapterScreen(
                                     delay(80)
                                     lazyListState.animateScrollToItem(3 + noteIdx)
                                 }
+                                delay(500)
                                 highlightProgress.animateTo(
                                     targetValue = 0f,
-                                    animationSpec = tween(durationMillis = 1000, easing = FastOutSlowInEasing)
+                                    animationSpec = tween(durationMillis = 2000, easing = FastOutSlowInEasing)
                                 )
                                 highlightedAnnotationIndex = null
                             }
