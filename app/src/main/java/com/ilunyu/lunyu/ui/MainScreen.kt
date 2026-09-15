@@ -75,28 +75,39 @@ fun MainScreen(
     val library by viewModel.library.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
 
-    var selectedTab by remember { mutableIntStateOf(0) }
     var activePianSlug by remember { mutableStateOf<String?>(null) }
-    var currentDestination by remember { mutableStateOf<ScreenDestination>(ScreenDestination.Tab(0)) }
+    var destinationStack by remember { mutableStateOf(listOf<ScreenDestination>(ScreenDestination.Tab(0))) }
+    var isNavigatingBack by remember { mutableStateOf(false) }
+    val currentDestination = destinationStack.last()
+    val currentTab = when (currentDestination) {
+        is ScreenDestination.Tab -> currentDestination.index
+        is ScreenDestination.ChapterDetail -> 0
+        is ScreenDestination.ExerciseDetail -> 1
+        is ScreenDestination.Search -> -1
+    }
+
+    fun navigateTo(dest: ScreenDestination) {
+        isNavigatingBack = false
+        destinationStack = destinationStack + dest
+    }
+
+    fun replaceTop(dest: ScreenDestination) {
+        isNavigatingBack = false
+        destinationStack = destinationStack.dropLast(1) + dest
+    }
+
+    fun navigateBack() {
+        if (destinationStack.size > 1) {
+            isNavigatingBack = true
+            destinationStack = destinationStack.dropLast(1)
+        }
+    }
+
     val coroutineScope = rememberCoroutineScope()
 
     // 硬件返回键处理
-    BackHandler(enabled = currentDestination !is ScreenDestination.Tab) {
-        when (currentDestination) {
-            is ScreenDestination.Search -> {
-                currentDestination = ScreenDestination.Tab(selectedTab)
-            }
-            is ScreenDestination.ChapterDetail -> {
-                // 返回阅读 Tab（保持在当前篇）
-                currentDestination = ScreenDestination.Tab(0)
-            }
-            is ScreenDestination.ExerciseDetail -> {
-                currentDestination = ScreenDestination.Tab(selectedTab)
-            }
-            else -> {
-                currentDestination = ScreenDestination.Tab(selectedTab)
-            }
-        }
+    BackHandler(enabled = destinationStack.size > 1) {
+        navigateBack()
     }
 
     val showBottomBar = currentDestination !is ScreenDestination.Search
@@ -112,18 +123,18 @@ fun MainScreen(
                 ) {
                     // 1. 阅读
                     NavigationBarItem(
-                        selected = selectedTab == 0 && currentDestination !is ScreenDestination.ExerciseDetail,
+                        selected = currentTab == 0,
                         onClick = {
-                            if (selectedTab == 0 && (activePianSlug != null || currentDestination is ScreenDestination.ChapterDetail)) {
+                            if (currentTab == 0 && (activePianSlug != null || currentDestination is ScreenDestination.ChapterDetail)) {
                                 // 在阅读页再次点击阅读 Tab：重置回篇目总览网格（完全对齐 Flutter _openCatalogPage）
                                 activePianSlug = null
                             }
-                            selectedTab = 0
-                            currentDestination = ScreenDestination.Tab(0)
+                            isNavigatingBack = false
+                            destinationStack = listOf(ScreenDestination.Tab(0))
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 0 && currentDestination !is ScreenDestination.ExerciseDetail) {
+                                imageVector = if (currentTab == 0) {
                                     Icons.AutoMirrored.Filled.MenuBook
                                 } else {
                                     Icons.AutoMirrored.Outlined.MenuBook
@@ -136,14 +147,14 @@ fun MainScreen(
 
                     // 2. 学习
                     NavigationBarItem(
-                        selected = selectedTab == 1 && currentDestination !is ScreenDestination.ChapterDetail,
+                        selected = currentTab == 1,
                         onClick = {
-                            selectedTab = 1
-                            currentDestination = ScreenDestination.Tab(1)
+                            isNavigatingBack = false
+                            destinationStack = listOf(ScreenDestination.Tab(1))
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 1 && currentDestination !is ScreenDestination.ChapterDetail) {
+                                imageVector = if (currentTab == 1) {
                                     Icons.Default.School
                                 } else {
                                     Icons.Outlined.School
@@ -156,14 +167,14 @@ fun MainScreen(
 
                     // 3. 收藏
                     NavigationBarItem(
-                        selected = selectedTab == 2,
+                        selected = currentTab == 2,
                         onClick = {
-                            selectedTab = 2
-                            currentDestination = ScreenDestination.Tab(2)
+                            isNavigatingBack = false
+                            destinationStack = listOf(ScreenDestination.Tab(2))
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 2) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
+                                imageVector = if (currentTab == 2) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
                                 contentDescription = "收藏"
                             )
                         },
@@ -172,14 +183,14 @@ fun MainScreen(
 
                     // 4. 设置（按要求：底栏“设置”图标保持不变，使用 Settings 图标）
                     NavigationBarItem(
-                        selected = selectedTab == 3,
+                        selected = currentTab == 3,
                         onClick = {
-                            selectedTab = 3
-                            currentDestination = ScreenDestination.Tab(3)
+                            isNavigatingBack = false
+                            destinationStack = listOf(ScreenDestination.Tab(3))
                         },
                         icon = {
                             Icon(
-                                imageVector = if (selectedTab == 3) Icons.Default.Settings else Icons.Outlined.Settings,
+                                imageVector = if (currentTab == 3) Icons.Default.Settings else Icons.Outlined.Settings,
                                 contentDescription = "设置"
                             )
                         },
@@ -241,23 +252,8 @@ fun MainScreen(
                             }
                         }
 
-                        // 2. 底部导航栏 Tab 间切换（Tab -> Tab）采用 MD3 Fade Through
-                        initial is ScreenDestination.Tab && target is ScreenDestination.Tab -> {
-                            (fadeIn(
-                                animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)
-                            ) + scaleIn(
-                                initialScale = 0.96f,
-                                animationSpec = tween(200, delayMillis = 40, easing = FastOutSlowInEasing)
-                            )) togetherWith (
-                                fadeOut(
-                                    animationSpec = tween(140, easing = FastOutLinearInEasing)
-                                )
-                            )
-                        }
-
-                        // 3. 返回上一级页面（如详情页返回 Tab，或详情页返回 Search）
-                        (initial !is ScreenDestination.Tab && target is ScreenDestination.Tab) ||
-                        ((initial is ScreenDestination.ChapterDetail || initial is ScreenDestination.ExerciseDetail) && target is ScreenDestination.Search) -> {
+                        // 2. 返回上一级页面（如详情页返回 Tab，或详情页返回 Search）
+                        isNavigatingBack -> {
                             (slideInHorizontally(
                                 initialOffsetX = { -(it * 0.20f).toInt() },
                                 animationSpec = tween(240, easing = FastOutSlowInEasing)
@@ -269,6 +265,20 @@ fun MainScreen(
                                     animationSpec = tween(220, easing = FastOutSlowInEasing)
                                 ) + fadeOut(
                                     animationSpec = tween(180, easing = FastOutLinearInEasing)
+                                )
+                            )
+                        }
+
+                        // 3. 底部导航栏 Tab 间切换采用 MD3 Fade Through
+                        target is ScreenDestination.Tab -> {
+                            (fadeIn(
+                                animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)
+                            ) + scaleIn(
+                                initialScale = 0.96f,
+                                animationSpec = tween(200, delayMillis = 40, easing = FastOutSlowInEasing)
+                            )) togetherWith (
+                                fadeOut(
+                                    animationSpec = tween(140, easing = FastOutLinearInEasing)
                                 )
                             )
                         }
@@ -305,10 +315,10 @@ fun MainScreen(
                                 onToggleChapterFavorite = { viewModel.toggleChapterFavorite(it) },
                                 onNavigateToChapter = { slug, number ->
                                     activePianSlug = slug
-                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                    navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToSearch = {
-                                    currentDestination = ScreenDestination.Search
+                                    navigateTo(ScreenDestination.Search)
                                 }
                             )
                             1 -> StudyScreen(
@@ -316,10 +326,10 @@ fun MainScreen(
                                 favoriteExerciseIds = favoriteExercises,
                                 onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                                 onNavigateToExercise = { exerciseId ->
-                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                    navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
-                                    currentDestination = ScreenDestination.Search
+                                    navigateTo(ScreenDestination.Search)
                                 }
                             )
                             2 -> FavoritesScreen(
@@ -331,13 +341,13 @@ fun MainScreen(
                                 onToggleExerciseFavorite = { viewModel.toggleExerciseFavorite(it) },
                                 onNavigateToChapter = { slug, number ->
                                     activePianSlug = slug
-                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                    navigateTo(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToExercise = { exerciseId ->
-                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                    navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onNavigateToSearch = {
-                                    currentDestination = ScreenDestination.Search
+                                    navigateTo(ScreenDestination.Search)
                                 }
                             )
                             3 -> SettingsScreen(
@@ -368,13 +378,13 @@ fun MainScreen(
                                 onToggleFavorite = { viewModel.toggleChapterFavorite(chapter.id) },
                                 onNavigateToChapter = { slug, number ->
                                     activePianSlug = slug
-                                    currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                    replaceTop(ScreenDestination.ChapterDetail(slug, number))
                                 },
                                 onNavigateToExercise = { exerciseId ->
-                                    currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                    navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                                 },
                                 onBack = {
-                                    currentDestination = ScreenDestination.Tab(selectedTab)
+                                    navigateBack()
                                 }
                             )
                         } else {
@@ -398,12 +408,12 @@ fun MainScreen(
                                         val target = viewModel.getChapterById("$sourceId")
                                         if (target != null) {
                                             activePianSlug = target.first.slug
-                                            currentDestination = ScreenDestination.ChapterDetail(target.first.slug, target.second.number)
+                                            navigateTo(ScreenDestination.ChapterDetail(target.first.slug, target.second.number))
                                         }
                                     }
                                 },
                                 onBack = {
-                                    currentDestination = ScreenDestination.Tab(selectedTab)
+                                    navigateBack()
                                 }
                             )
                         } else {
@@ -418,13 +428,13 @@ fun MainScreen(
                             exercises = exercises,
                             onNavigateToChapter = { slug, number ->
                                 activePianSlug = slug
-                                currentDestination = ScreenDestination.ChapterDetail(slug, number)
+                                navigateTo(ScreenDestination.ChapterDetail(slug, number))
                             },
                             onNavigateToExercise = { exerciseId ->
-                                currentDestination = ScreenDestination.ExerciseDetail(exerciseId)
+                                navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
                             },
                             onBack = {
-                                currentDestination = ScreenDestination.Tab(selectedTab)
+                                navigateBack()
                             }
                         )
                     }
