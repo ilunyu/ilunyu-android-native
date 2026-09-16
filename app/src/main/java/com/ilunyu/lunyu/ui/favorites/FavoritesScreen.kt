@@ -323,7 +323,7 @@ fun FavoritesScreen(
                                     onChipClick = { dimension ->
                                         activeFilterDimension = dimension
                                     },
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                                    modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
                                 )
                             }
 
