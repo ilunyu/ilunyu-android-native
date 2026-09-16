@@ -161,7 +161,7 @@ fun StudyScreen(
                     Text(
                         text = "共 ${filteredExercises.size} 题",
                         style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.Normal,
+                            fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         ),
                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)

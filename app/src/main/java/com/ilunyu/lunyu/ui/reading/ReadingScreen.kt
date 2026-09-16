@@ -257,7 +257,7 @@ fun ReadingScreen(
                                 Text(
                                     text = "共 ${currentPian.chapters.size} 章",
                                     style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.Normal,
+                                        fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
                                 )

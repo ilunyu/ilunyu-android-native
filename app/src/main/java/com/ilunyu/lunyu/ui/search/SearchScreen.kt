@@ -291,7 +291,7 @@ fun SearchScreen(
                                     Text(
                                         text = "共 ${matchingChapters.size} 章",
                                         style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.Normal,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
@@ -342,7 +342,7 @@ fun SearchScreen(
                                     Text(
                                         text = "共 ${matchingExercises.size} 题",
                                         style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.Normal,
+                                            fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)

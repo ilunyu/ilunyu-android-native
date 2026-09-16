@@ -158,7 +158,7 @@ fun LunyuScrollableTabRow(
                             text = title,
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontSize = 14.sp,
-                                fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                                fontWeight = FontWeight.SemiBold,
                                 color = if (isSelected) selectedContentColor else unselectedContentColor
                             ),
                             textAlign = TextAlign.Center,
@@ -283,7 +283,7 @@ fun LunyuFixedTabRow(
                         text = title,
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontSize = 14.sp,
-                            fontWeight = if (isSelected) FontWeight.Medium else FontWeight.Normal,
+                            fontWeight = FontWeight.SemiBold,
                             color = if (isSelected) selectedContentColor else unselectedContentColor
                         ),
                         textAlign = TextAlign.Center
