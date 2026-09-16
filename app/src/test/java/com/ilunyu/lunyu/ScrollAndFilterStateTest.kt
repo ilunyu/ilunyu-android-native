@@ -99,4 +99,67 @@ class ScrollAndFilterStateTest {
         assertEquals(10 to 80, pianScrollMap["02-weizheng"])
         assertEquals(null, pianScrollMap["03-bayi"])
     }
+
+    @Test
+    fun testCollapsibleSingleTopBarGeometry() {
+        val maxHeight = 2100
+        val topBarHeight = 150 // e.g. 56dp
+
+        // Test fully expanded (offset = 0)
+        run {
+            val currentOffset = 0
+            val contentTop = topBarHeight + currentOffset
+            val contentHeight = (maxHeight - contentTop).coerceAtLeast(0)
+            assertEquals(150, contentTop)
+            assertEquals(1950, contentHeight)
+            assertEquals(maxHeight, contentTop + contentHeight)
+        }
+
+        // Test fully collapsed (offset = -topBarHeight)
+        run {
+            val currentOffset = -topBarHeight
+            val contentTop = topBarHeight + currentOffset
+            val contentHeight = (maxHeight - contentTop).coerceAtLeast(0)
+            assertEquals(0, contentTop)
+            assertEquals(maxHeight, contentHeight)
+            assertEquals(maxHeight, contentTop + contentHeight)
+        }
+
+        // Test partially collapsed (offset = -75)
+        run {
+            val currentOffset = -75
+            val contentTop = topBarHeight + currentOffset
+            val contentHeight = (maxHeight - contentTop).coerceAtLeast(0)
+            assertEquals(75, contentTop)
+            assertEquals(2025, contentHeight)
+            assertEquals(maxHeight, contentTop + contentHeight)
+        }
+    }
+
+    @Test
+    fun testCollapsibleTabLayoutGeometry() {
+        val maxHeight = 2100
+        val topBarHeight = 150 // 56dp
+        val tabBarHeight = 130 // 48dp
+
+        // Test fully expanded (offset = 0)
+        run {
+            val currentOffset = 0
+            val contentTop = topBarHeight + tabBarHeight + currentOffset
+            val contentHeight = (maxHeight - contentTop).coerceAtLeast(0)
+            assertEquals(280, contentTop)
+            assertEquals(1820, contentHeight)
+            assertEquals(maxHeight, contentTop + contentHeight)
+        }
+
+        // Test fully collapsed (offset = -topBarHeight)
+        run {
+            val currentOffset = -topBarHeight
+            val contentTop = topBarHeight + tabBarHeight + currentOffset
+            val contentHeight = (maxHeight - contentTop).coerceAtLeast(0)
+            assertEquals(tabBarHeight, contentTop)
+            assertEquals(maxHeight - tabBarHeight, contentHeight)
+            assertEquals(maxHeight, contentTop + contentHeight)
+        }
+    }
 }

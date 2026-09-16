@@ -363,16 +363,16 @@ fun LunyuCollapsibleTabLayout(
 
         scrollState.updateBarHeightPx(topBarHeight.toFloat())
 
-        val contentHeight = (constraints.maxHeight - tabBarHeight).coerceAtLeast(0)
+        val currentOffset = scrollState.offset.roundToInt() // [-topBarHeight, 0]
+        val contentTop = topBarHeight + tabBarHeight + currentOffset
+        val contentHeight = (constraints.maxHeight - contentTop).coerceAtLeast(0)
         val contentPlaceable = measurables[2].measure(
             constraints.copy(minHeight = contentHeight, maxHeight = contentHeight)
         )
 
         layout(constraints.maxWidth, constraints.maxHeight) {
-            val currentOffset = scrollState.offset.roundToInt() // [-topBarHeight, 0]
-
             // Child 2: Content 先放置，使其在 Z 轴上处于底层，内容绝不上浮遮挡顶栏或 TabBar
-            contentPlaceable.placeWithLayer(0, topBarHeight + tabBarHeight + currentOffset)
+            contentPlaceable.placeWithLayer(0, contentTop)
 
             // Child 0: TopBar 刚体位移（覆盖在内容上方）
             topBarPlaceable.placeWithLayer(0, currentOffset)
@@ -384,7 +384,7 @@ fun LunyuCollapsibleTabLayout(
 }
 
 /**
- * 论语可折叠单顶栏脚手架（无 TabBar 场景，适用于章阅读等详情页面）
+ * 论语可折叠单顶栏脚手架（无 TabBar 场景，适用于章阅读、试题详情等页面）
  *
  * 布局物理架构：
  * - 顶栏 (TopBar 56dp) 位于顶部，初始展开；
@@ -392,7 +392,8 @@ fun LunyuCollapsibleTabLayout(
  * - 向上滑动时，TopBar 向上平移移出屏幕，Content 同步跟手向上平移；
  * - 向下滑动时，TopBar 从顶部落下展开，Content 同步跟手向下平移；
  * - 顶栏在完全收起时位移为 -barHeightPx，展开时为 0；
- * - 采用 placeWithLayer 进行纯 GPU 硬件图层平移，不触发全局重新测量与重排。
+ * - 主内容区域根据顶栏实时展开偏移量精确计算可用视口高度 (constraints.maxHeight - contentTop)，
+ *   确保无论顶栏展开或收起，内容区底部永远精准贴合屏幕物理底边缘，消除虚空裁切与余量下沉。
  */
 @Composable
 fun LunyuCollapsibleSingleTopBarLayout(
@@ -434,15 +435,17 @@ fun LunyuCollapsibleSingleTopBarLayout(
 
         scrollState.updateBarHeightPx(topBarHeight.toFloat())
 
+        val currentOffset = scrollState.offset.roundToInt() // [-topBarHeight, 0]
+        val contentTop = topBarHeight + currentOffset
+        val contentHeight = (constraints.maxHeight - contentTop).coerceAtLeast(0)
+
         val contentPlaceable = measurables[1].measure(
-            constraints.copy(minHeight = constraints.maxHeight, maxHeight = constraints.maxHeight)
+            constraints.copy(minHeight = contentHeight, maxHeight = contentHeight)
         )
 
         layout(constraints.maxWidth, constraints.maxHeight) {
-            val currentOffset = scrollState.offset.roundToInt() // [-topBarHeight, 0]
-
             // Child 1: Content 在 Z 轴底层
-            contentPlaceable.placeWithLayer(0, topBarHeight + currentOffset)
+            contentPlaceable.placeWithLayer(0, contentTop)
 
             // Child 0: TopBar 在 Z 轴顶层
             topBarPlaceable.placeWithLayer(0, currentOffset)
