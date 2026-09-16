@@ -192,4 +192,21 @@ class ScrollAndFilterStateTest {
         assertEquals("期末", getTypeChipLabel(setOf("期末")))
         assertEquals("4类试卷", getTypeChipLabel(setOf("期末", "期中", "模拟", "练习")))
     }
+
+    @Test
+    fun testSourceAndTypeSorting() {
+        val rawSources = listOf("延庆", "朝阳", "北京", "东城", "海淀", "西城", "门头沟", "平谷")
+        val sortedSources = com.ilunyu.lunyu.ui.study.sortSources(rawSources)
+        assertEquals(
+            listOf("北京", "东城", "西城", "海淀", "朝阳", "门头沟", "平谷", "延庆"),
+            sortedSources
+        )
+
+        val rawTypes = listOf("其他", "期末", "真题", "期中", "二模", "一模")
+        val sortedTypes = com.ilunyu.lunyu.ui.study.sortTypes(rawTypes)
+        assertEquals(
+            listOf("真题", "一模", "二模", "期中", "期末", "其他"),
+            sortedTypes
+        )
+    }
 }

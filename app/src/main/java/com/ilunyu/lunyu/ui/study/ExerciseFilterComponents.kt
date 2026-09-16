@@ -1,18 +1,19 @@
 package com.ilunyu.lunyu.ui.study
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -24,14 +25,13 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -44,9 +44,51 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+
+/**
+ * 试题筛选地区官方排序规定：
+ * 北京、东城、西城、海淀、朝阳、丰台、石景山、通州、大兴、昌平、顺义、房山、门头沟、平谷、怀柔、密云、延庆
+ */
+val DISTRICT_ORDER = listOf(
+    "北京", "东城", "西城", "海淀", "朝阳", "丰台", "石景山",
+    "通州", "大兴", "昌平", "顺义", "房山", "门头沟", "平谷",
+    "怀柔", "密云", "延庆"
+)
+
+/**
+ * 试题筛选类别官方排序规定：
+ * 真题、一模、二模、期中、期末、其他
+ */
+val TYPE_ORDER = listOf(
+    "真题", "一模", "二模", "期中", "期末", "其他"
+)
+
+/**
+ * 按指定顺序对地区进行排序
+ */
+fun sortSources(sources: Collection<String>): List<String> {
+    val orderMap = DISTRICT_ORDER.withIndex().associate { it.value to it.index }
+    return sources.sortedWith(
+        compareBy<String> { orderMap[it] ?: (DISTRICT_ORDER.size + 1) }
+            .thenBy { it }
+    )
+}
+
+/**
+ * 按指定顺序对试卷类别进行排序
+ */
+fun sortTypes(types: Collection<String>): List<String> {
+    val orderMap = TYPE_ORDER.withIndex().associate { it.value to it.index }
+    return types.sortedWith(
+        compareBy<String> { orderMap[it] ?: (TYPE_ORDER.size + 1) }
+            .thenBy { it }
+    )
+}
 
 /**
  * 试题筛选维度定义
@@ -258,6 +300,60 @@ fun ExerciseFilterBottomSheet(
     val configuration = LocalConfiguration.current
     val maxSheetHeight = (configuration.screenHeightDp * 0.70f).dp
 
+    val sortedSources = remember(availableSources) { sortSources(availableSources) }
+    val sortedTypes = remember(availableTypes) { sortTypes(availableTypes) }
+
+    val cardItems: List<FilterCardItem> = when (dimension) {
+        ExerciseFilterDimension.YEAR -> availableYears.map { year ->
+            FilterCardItem(
+                id = year,
+                label = year,
+                isSelected = tempYears.contains(year),
+                onToggle = {
+                    tempYears = if (tempYears.contains(year)) tempYears - year else tempYears + year
+                }
+            )
+        }
+        ExerciseFilterDimension.SOURCE -> sortedSources.map { source ->
+            FilterCardItem(
+                id = source,
+                label = source,
+                isSelected = tempSources.contains(source),
+                onToggle = {
+                    tempSources = if (tempSources.contains(source)) tempSources - source else tempSources + source
+                }
+            )
+        }
+        ExerciseFilterDimension.GRADE -> listOf(1, 2, 3).map { grade ->
+            val gradeLabel = when (grade) {
+                1 -> "高一"
+                2 -> "高二"
+                3 -> "高三"
+                else -> "高$grade"
+            }
+            FilterCardItem(
+                id = grade.toString(),
+                label = gradeLabel,
+                isSelected = tempGrades.contains(grade),
+                onToggle = {
+                    tempGrades = if (tempGrades.contains(grade)) tempGrades - grade else tempGrades + grade
+                }
+            )
+        }
+        ExerciseFilterDimension.TYPE -> sortedTypes.map { type ->
+            FilterCardItem(
+                id = type,
+                label = type,
+                isSelected = tempTypes.contains(type),
+                onToggle = {
+                    tempTypes = if (tempTypes.contains(type)) tempTypes - type else tempTypes + type
+                }
+            )
+        }
+    }
+
+    val rows = remember(cardItems) { cardItems.chunked(3) }
+
     ModalBottomSheet(
         onDismissRequest = {
             onApply(tempYears, tempSources, tempGrades, tempTypes)
@@ -274,19 +370,19 @@ fun ExerciseFilterBottomSheet(
                 .heightIn(max = maxSheetHeight)
                 .padding(bottom = 12.dp)
         ) {
-            // 顶栏：标题与重置按钮
+            // 顶栏：标题与重置按钮（小标题字号对齐章阅读/题目小标题 18sp SemiBold）
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 16.dp, top = 2.dp, bottom = 8.dp),
+                    .padding(start = 24.dp, end = 16.dp, top = 2.dp, bottom = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
                     text = "筛选${dimension.title}",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp,
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 18.sp,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                 )
@@ -314,62 +410,29 @@ fun ExerciseFilterBottomSheet(
                 }
             }
 
-            // 多选选项列表（根据维度填充）
+            // 选项卡片网格（一行三个、圆角 8px 矩形卡片）
             LazyColumn(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f, fill = false)
-                    .padding(horizontal = 8.dp)
+                    .padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                when (dimension) {
-                    ExerciseFilterDimension.YEAR -> {
-                        items(availableYears) { year ->
-                            FilterItemRow(
-                                label = year,
-                                isChecked = tempYears.contains(year),
-                                onToggle = {
-                                    tempYears = if (tempYears.contains(year)) tempYears - year else tempYears + year
-                                }
+                items(rows) { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        rowItems.forEach { item ->
+                            FilterGridCard(
+                                label = item.label,
+                                isSelected = item.isSelected,
+                                onToggle = item.onToggle,
+                                modifier = Modifier.weight(1f)
                             )
                         }
-                    }
-                    ExerciseFilterDimension.SOURCE -> {
-                        items(availableSources) { source ->
-                            FilterItemRow(
-                                label = source,
-                                isChecked = tempSources.contains(source),
-                                onToggle = {
-                                    tempSources = if (tempSources.contains(source)) tempSources - source else tempSources + source
-                                }
-                            )
-                        }
-                    }
-                    ExerciseFilterDimension.GRADE -> {
-                        items(listOf(1, 2, 3)) { grade ->
-                            val gradeLabel = when (grade) {
-                                1 -> "高一"
-                                2 -> "高二"
-                                3 -> "高三"
-                                else -> "高$grade"
-                            }
-                            FilterItemRow(
-                                label = gradeLabel,
-                                isChecked = tempGrades.contains(grade),
-                                onToggle = {
-                                    tempGrades = if (tempGrades.contains(grade)) tempGrades - grade else tempGrades + grade
-                                }
-                            )
-                        }
-                    }
-                    ExerciseFilterDimension.TYPE -> {
-                        items(availableTypes) { type ->
-                            FilterItemRow(
-                                label = type,
-                                isChecked = tempTypes.contains(type),
-                                onToggle = {
-                                    tempTypes = if (tempTypes.contains(type)) tempTypes - type else tempTypes + type
-                                }
-                            )
+                        repeat(3 - rowItems.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -408,35 +471,74 @@ fun ExerciseFilterBottomSheet(
     }
 }
 
+private data class FilterCardItem(
+    val id: String,
+    val label: String,
+    val isSelected: Boolean,
+    val onToggle: () -> Unit
+)
+
+/**
+ * 筛选卡片组件：
+ * 一行三个、圆角为 8px 的圆角矩形卡片；
+ * 未选中为默认表面颜色，点按有水波纹（Surface 自带交互状态水波纹）；
+ * 选中为青绿色加粗且左侧出现对勾 icon。
+ */
 @Composable
-private fun FilterItemRow(
+private fun FilterGridCard(
     label: String,
-    isChecked: Boolean,
-    onToggle: () -> Unit
+    isSelected: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable { onToggle() }
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
+    Surface(
+        onClick = onToggle,
+        modifier = modifier.height(42.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = if (isSelected) {
+            MaterialTheme.colorScheme.secondaryContainer
+        } else {
+            MaterialTheme.colorScheme.surface
+        },
+        border = BorderStroke(
+            width = 1.dp,
+            color = if (isSelected) {
+                Color.Transparent
+            } else {
+                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            }
+        )
     ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.bodyLarge.copy(
-                fontSize = 16.sp,
-                color = MaterialTheme.colorScheme.onSurface
-            ),
-            modifier = Modifier.weight(1f)
-        )
-        Checkbox(
-            checked = isChecked,
-            onCheckedChange = { onToggle() },
-            colors = CheckboxDefaults.colors(
-                checkedColor = MaterialTheme.colorScheme.primary,
-                uncheckedColor = MaterialTheme.colorScheme.onSurfaceVariant
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 6.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (isSelected) {
+                Icon(
+                    imageVector = Icons.Default.Check,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(4.dp))
+            }
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium.copy(
+                    fontSize = if (label.length > 5) 12.sp else 14.sp,
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (isSelected) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
-        )
+        }
     }
 }

@@ -67,10 +67,12 @@ fun StudyScreen(
         exercises.map { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending()
     }
     val availableSources = remember(exercises) {
-        exercises.map { it.source }.filter { it.isNotBlank() }.distinct().sorted()
+        val raw = exercises.map { it.source }.filter { it.isNotBlank() }.distinct()
+        sortSources(raw)
     }
     val availableTypes = remember(exercises) {
-        exercises.map { it.type }.filter { it.isNotBlank() }.distinct().sorted()
+        val raw = exercises.map { it.type }.filter { it.isNotBlank() }.distinct()
+        sortTypes(raw)
     }
 
     val filteredExercises = remember(exercises, selectedYears, selectedSources, selectedGrades, selectedTypes) {
@@ -107,9 +109,9 @@ fun StudyScreen(
             .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
     ) {
-        // 1. 顶栏：移除左上角图标，仅保留右侧搜索按钮
+        // 1. 顶栏：标准独立顶栏，仅保留右侧搜索按钮，当下方列表滚动时显示分割线
         LunyuTopBar(
-            showDivider = false,
+            showDivider = isScrolledUnder,
             actions = {
                 IconButton(onClick = onNavigateToSearch) {
                     Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
@@ -118,54 +120,55 @@ fun StudyScreen(
             }
         )
 
-        // 2. 列表与统计信息上方的四个 Chips（依次为学年、地区、年级、类别，支持横向延伸滑动）
-        ExerciseFilterChipsRow(
-            selectedYears = selectedYears,
-            selectedSources = selectedSources,
-            selectedGrades = selectedGrades,
-            selectedTypes = selectedTypes,
-            onChipClick = { dimension ->
-                activeFilterDimension = dimension
-            }
-        )
-
-        // 3. 滚动到底部分割线（跟随内容滚动状态）
-        HorizontalDivider(
-            thickness = 1.dp,
-            color = if (isScrolledUnder) MaterialTheme.colorScheme.outlineVariant else Color.Transparent
-        )
-
-        // 4. 内容展示区
+        // 2. 内容展示区（四个筛选 Chips 作为列表内容顶部的一部分，跟随列表整体平滑滚动）
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            if (filteredExercises.isEmpty()) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "没有符合条件的题目。",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+            LazyColumn(
+                state = lazyListState,
+                modifier = Modifier.fillMaxSize()
+            ) {
+                // 列表内容顶部的四个 Chips（依次为学年、地区、年级、类别，支持横向延伸滑动）
+                item(key = "filter_chips") {
+                    ExerciseFilterChipsRow(
+                        selectedYears = selectedYears,
+                        selectedSources = selectedSources,
+                        selectedGrades = selectedGrades,
+                        selectedTypes = selectedTypes,
+                        onChipClick = { dimension ->
+                            activeFilterDimension = dimension
+                        },
+                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
                     )
                 }
-            } else {
-                LazyColumn(
-                    state = lazyListState,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    item {
+
+                if (filteredExercises.isEmpty()) {
+                    item(key = "empty_state") {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 100.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "没有符合条件的题目。",
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            )
+                        }
+                    }
+                } else {
+                    item(key = "count_header") {
                         Text(
                             text = "共 ${filteredExercises.size} 题",
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp)
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
                         )
                     }
 
@@ -183,7 +186,9 @@ fun StudyScreen(
                         )
                     }
 
-                    item { Spacer(modifier = Modifier.height(48.dp)) }
+                    item(key = "bottom_spacer") {
+                        Spacer(modifier = Modifier.height(48.dp))
+                    }
                 }
             }
         }
