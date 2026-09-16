@@ -363,7 +363,7 @@ fun SearchScreen(
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
-                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 0.dp)
+                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 0.dp)
                                     )
                                 }
 
