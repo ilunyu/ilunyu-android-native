@@ -424,12 +424,12 @@ fun ExerciseFilterBottomSheet(
                     .fillMaxWidth()
                     .weight(1f, fill = false)
                     .padding(horizontal = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(rows) { rowItems ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         rowItems.forEach { item ->
                             FilterGridCard(
