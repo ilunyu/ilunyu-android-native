@@ -298,16 +298,16 @@ fun MainScreen(
                             )
                         }
 
-                        // 3. 底部导航栏 Tab 间切换采用 MD3 Fade Through
+                        // 3. 底部导航栏 Tab 间切换采用先淡出后淡入，避免半透明重叠
                         target is ScreenDestination.Tab -> {
                             (fadeIn(
-                                animationSpec = tween(200, delayMillis = 40, easing = LinearOutSlowInEasing)
+                                animationSpec = tween(150, delayMillis = 120, easing = LinearOutSlowInEasing)
                             ) + scaleIn(
-                                initialScale = 0.96f,
-                                animationSpec = tween(200, delayMillis = 40, easing = FastOutSlowInEasing)
+                                initialScale = 0.98f,
+                                animationSpec = tween(150, delayMillis = 120, easing = FastOutSlowInEasing)
                             )) togetherWith (
                                 fadeOut(
-                                    animationSpec = tween(140, easing = FastOutLinearInEasing)
+                                    animationSpec = tween(120, easing = FastOutLinearInEasing)
                                 )
                             )
                         }

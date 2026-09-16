@@ -111,19 +111,19 @@ enum class ExerciseFilterDimension(val title: String) {
 fun getYearChipLabel(selected: Set<String>): String = when {
     selected.isEmpty() -> "学年"
     selected.size == 1 -> selected.first()
-    else -> "${selected.size}个学年"
+    else -> "${selected.size} 个学年"
 }
 
 /**
  * 计算地区 Chip 文案：
  * - 未筛选：显示默认提示“地区”；
  * - 筛选 1 个：显示筛选内容（如“东城”）；
- * - 筛选多个：显示个数（如“3个地区”）。
+ * - 筛选多个：显示个数（如“3 个地区”）。
  */
 fun getSourceChipLabel(selected: Set<String>): String = when {
     selected.isEmpty() -> "地区"
     selected.size == 1 -> selected.first()
-    else -> "${selected.size}个地区"
+    else -> "${selected.size} 个地区"
 }
 
 /**
@@ -131,7 +131,7 @@ fun getSourceChipLabel(selected: Set<String>): String = when {
  * - 未筛选：显示默认提示“年级”；
  * - 筛选 1 个：显示年级名称（如“高一”、“高二”、“高三”）；
  * - 筛选 3 个全选：显示“全部年级”；
- * - 筛选 2 个：显示“2个年级”。
+ * - 筛选 2 个：显示“2 个年级”。
  */
 fun getGradeChipLabel(selected: Set<Int>): String = when {
     selected.isEmpty() -> "年级"
@@ -142,19 +142,19 @@ fun getGradeChipLabel(selected: Set<Int>): String = when {
         else -> "高${selected.first()}"
     }
     selected.size == 3 -> "全部年级"
-    else -> "${selected.size}个年级"
+    else -> "${selected.size} 个年级"
 }
 
 /**
  * 计算类别 Chip 文案：
  * - 未筛选：显示默认提示“类别”；
  * - 筛选 1 个：显示筛选内容（如“期末”）；
- * - 筛选多个：显示个数（如“4类试卷”）。
+ * - 筛选多个：显示个数（如“4 类试卷”）。
  */
 fun getTypeChipLabel(selected: Set<String>): String = when {
     selected.isEmpty() -> "类别"
     selected.size == 1 -> selected.first()
-    else -> "${selected.size}类试卷"
+    else -> "${selected.size} 类试卷"
 }
 
 /**
@@ -450,7 +450,7 @@ fun ExerciseFilterBottomSheet(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 16.dp)
+                    .padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 16.dp)
             ) {
                 Button(
                     onClick = {

@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -47,7 +48,13 @@ import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.Pian
 import com.ilunyu.lunyu.ui.reading.PianChapterRow
-import com.ilunyu.lunyu.ui.study.ExerciseFilterDialog
+import com.ilunyu.lunyu.ui.study.ExerciseFilterDimension
+import com.ilunyu.lunyu.ui.study.ExerciseFilterChipsRow
+import com.ilunyu.lunyu.ui.study.ExerciseFilterBottomSheet
+import com.ilunyu.lunyu.ui.study.DISTRICT_ORDER
+import com.ilunyu.lunyu.ui.study.TYPE_ORDER
+import com.ilunyu.lunyu.ui.study.sortSources
+import com.ilunyu.lunyu.ui.study.sortTypes
 import com.ilunyu.lunyu.ui.study.ExerciseListRow
 import kotlinx.coroutines.launch
 
@@ -96,21 +103,18 @@ fun FavoritesScreen(
     }
 
     // 试题筛选状态
-    var showFilterDialog by remember { mutableStateOf(false) }
-
-    val hasActiveExerciseFilters = selectedYears.isNotEmpty() ||
-            selectedSources.isNotEmpty() ||
-            selectedGrades.isNotEmpty() ||
-            selectedTypes.isNotEmpty()
+    var activeFilterDimension by remember { mutableStateOf<ExerciseFilterDimension?>(null) }
 
     val availableYears = remember(allExercises) {
         allExercises.map { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending()
     }
     val availableSources = remember(allExercises) {
-        allExercises.map { it.source }.filter { it.isNotBlank() }.distinct().sorted()
+        val raw = allExercises.map { it.source }.filter { it.isNotBlank() }.distinct()
+        sortSources((DISTRICT_ORDER + raw).distinct())
     }
     val availableTypes = remember(allExercises) {
-        allExercises.map { it.type }.filter { it.isNotBlank() }.distinct().sorted()
+        val raw = allExercises.map { it.type }.filter { it.isNotBlank() }.distinct()
+        sortTypes((TYPE_ORDER + raw).distinct())
     }
 
     // 收藏章节数据过滤与排序
@@ -204,16 +208,6 @@ fun FavoritesScreen(
                                 }
                             )
                         }
-                        // 筛选按钮（仅在试题 Tab 下展示，在排序按钮右侧）
-                        if (pagerState.currentPage == 1) {
-                            IconButton(onClick = { showFilterDialog = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.FilterList,
-                                    contentDescription = "筛选题目",
-                                    tint = if (hasActiveExerciseFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-                        }
                     }
                 },
                 actions = {
@@ -290,7 +284,8 @@ fun FavoritesScreen(
                 }
                 1 -> {
                     // 试题收藏列表
-                    if (favoriteExercises.isEmpty()) {
+                    val hasAnyFavorites = favoriteExerciseIds.isNotEmpty()
+                    if (!hasAnyFavorites) {
                         Box(
                             modifier = Modifier.fillMaxSize(),
                             contentAlignment = Alignment.Center
@@ -307,32 +302,66 @@ fun FavoritesScreen(
                             state = exerciseListState,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            item {
+                            // 列表顶部的四个 Chips（学年、地区、年级、类别）
+                            item(key = "filter_chips") {
+                                ExerciseFilterChipsRow(
+                                    selectedYears = selectedYears,
+                                    selectedSources = selectedSources,
+                                    selectedGrades = selectedGrades,
+                                    selectedTypes = selectedTypes,
+                                    onChipClick = { dimension ->
+                                        activeFilterDimension = dimension
+                                    },
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                )
+                            }
+
+                            item(key = "count_header") {
                                 Text(
                                     text = "共 ${favoriteExercises.size} 题",
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
                                 )
                             }
 
-                            itemsIndexed(
-                                items = favoriteExercises,
-                                key = { _, exercise -> exercise.id }
-                            ) { index, exercise ->
-                                val isFav = favoriteExerciseIds.contains(exercise.id)
-                                ExerciseListRow(
-                                    exercise = exercise,
-                                    isFavorite = isFav,
-                                    onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
-                                    onClick = { onNavigateToExercise(exercise.id) },
-                                    showDivider = index < favoriteExercises.size - 1
-                                )
+                            if (favoriteExercises.isEmpty()) {
+                                item(key = "empty_filtered") {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(top = 48.dp),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = "暂无符合筛选条件的收藏试题",
+                                            style = MaterialTheme.typography.bodyMedium.copy(
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        )
+                                    }
+                                }
+                            } else {
+                                itemsIndexed(
+                                    items = favoriteExercises,
+                                    key = { _, exercise -> exercise.id }
+                                ) { index, exercise ->
+                                    val isFav = favoriteExerciseIds.contains(exercise.id)
+                                    ExerciseListRow(
+                                        exercise = exercise,
+                                        isFavorite = isFav,
+                                        onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
+                                        onClick = { onNavigateToExercise(exercise.id) },
+                                        showDivider = index < favoriteExercises.size - 1
+                                    )
+                                }
                             }
 
-                            item { Spacer(modifier = Modifier.height(48.dp)) }
+                            item(key = "bottom_spacer") {
+                                Spacer(modifier = Modifier.height(48.dp))
+                            }
                         }
                     }
                 }
@@ -340,19 +369,20 @@ fun FavoritesScreen(
         }
     }
 
-    if (showFilterDialog) {
-        ExerciseFilterDialog(
+    if (activeFilterDimension != null) {
+        ExerciseFilterBottomSheet(
+            dimension = activeFilterDimension!!,
             availableYears = availableYears,
             availableSources = availableSources,
             availableTypes = availableTypes,
-            initialYears = selectedYears,
-            initialSources = selectedSources,
-            initialGrades = selectedGrades,
-            initialTypes = selectedTypes,
-            onDismiss = { showFilterDialog = false },
+            selectedYears = selectedYears,
+            selectedSources = selectedSources,
+            selectedGrades = selectedGrades,
+            selectedTypes = selectedTypes,
+            onDismiss = { activeFilterDimension = null },
             onApply = { years, sources, grades, types ->
                 onUpdateExerciseFilters(years, sources, grades, types)
-                showFilterDialog = false
+                activeFilterDimension = null
                 coroutineScope.launch {
                     exerciseListState.scrollToItem(0, 0)
                 }

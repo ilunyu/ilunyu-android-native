@@ -96,17 +96,17 @@ fun ReadingScreen(
         targetState = activePianSlug == null,
         transitionSpec = {
             if (!targetState) {
-                // 进入篇阅读视图（总览 -> 篇阅读）
-                (fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
-                 scaleIn(initialScale = 0.96f, animationSpec = tween(220, easing = FastOutSlowInEasing))) togetherWith
-                (fadeOut(animationSpec = tween(160, easing = FastOutLinearInEasing)) +
-                 scaleOut(targetScale = 1.02f, animationSpec = tween(160, easing = FastOutLinearInEasing)))
+                // 进入篇阅读视图（总览 -> 篇阅读：先淡出总览，再淡入篇阅读）
+                (fadeIn(animationSpec = tween(160, delayMillis = 120, easing = LinearOutSlowInEasing)) +
+                 scaleIn(initialScale = 0.98f, animationSpec = tween(160, delayMillis = 120, easing = FastOutSlowInEasing))) togetherWith
+                (fadeOut(animationSpec = tween(120, easing = FastOutLinearInEasing)) +
+                 scaleOut(targetScale = 1.01f, animationSpec = tween(120, easing = FastOutLinearInEasing)))
             } else {
-                // 返回篇目总览（篇阅读 -> 总览）
-                (fadeIn(animationSpec = tween(220, easing = LinearOutSlowInEasing)) +
-                 scaleIn(initialScale = 1.02f, animationSpec = tween(220, easing = FastOutSlowInEasing))) togetherWith
-                (fadeOut(animationSpec = tween(160, easing = FastOutLinearInEasing)) +
-                 scaleOut(targetScale = 0.96f, animationSpec = tween(160, easing = FastOutLinearInEasing)))
+                // 返回篇目总览（篇阅读 -> 总览：先淡出篇阅读，再淡入总览）
+                (fadeIn(animationSpec = tween(160, delayMillis = 120, easing = LinearOutSlowInEasing)) +
+                 scaleIn(initialScale = 1.01f, animationSpec = tween(160, delayMillis = 120, easing = FastOutSlowInEasing))) togetherWith
+                (fadeOut(animationSpec = tween(120, easing = FastOutLinearInEasing)) +
+                 scaleOut(targetScale = 0.98f, animationSpec = tween(120, easing = FastOutLinearInEasing)))
             }
         },
         label = "ReadingOverviewPagerTransition",

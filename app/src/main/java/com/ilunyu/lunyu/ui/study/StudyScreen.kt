@@ -40,6 +40,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.Exercise
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -109,9 +110,19 @@ fun StudyScreen(
             .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
     ) {
-        // 1. 顶栏：标准独立顶栏，仅保留右侧搜索按钮，当下方列表滚动时显示分割线
+        // 1. 顶栏：标准独立顶栏，展示“试题库”大标题与右侧搜索按钮，当下方列表滚动时显示分割线
         LunyuTopBar(
             showDivider = isScrolledUnder,
+            title = {
+                Text(
+                    text = "试题库",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                )
+            },
             actions = {
                 IconButton(onClick = onNavigateToSearch) {
                     Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")

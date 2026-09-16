@@ -54,6 +54,13 @@ import com.ilunyu.lunyu.data.model.Pian
 import com.ilunyu.lunyu.ui.common.LunyuFixedTabRow
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.reading.PianChapterRow
+import com.ilunyu.lunyu.ui.study.ExerciseFilterDimension
+import com.ilunyu.lunyu.ui.study.ExerciseFilterChipsRow
+import com.ilunyu.lunyu.ui.study.ExerciseFilterBottomSheet
+import com.ilunyu.lunyu.ui.study.DISTRICT_ORDER
+import com.ilunyu.lunyu.ui.study.TYPE_ORDER
+import com.ilunyu.lunyu.ui.study.sortSources
+import com.ilunyu.lunyu.ui.study.sortTypes
 import com.ilunyu.lunyu.ui.study.ExerciseListRow
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -167,6 +174,33 @@ fun SearchScreen(
                         .thenByDescending { it.month }
                         .thenBy { it.id }
                 )
+        }
+    }
+
+    var selectedYears by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var selectedSources by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var selectedGrades by rememberSaveable { mutableStateOf(emptySet<Int>()) }
+    var selectedTypes by rememberSaveable { mutableStateOf(emptySet<String>()) }
+    var activeFilterDimension by remember { mutableStateOf<ExerciseFilterDimension?>(null) }
+
+    val availableYears = remember(exercises) {
+        exercises.map { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending()
+    }
+    val availableSources = remember(exercises) {
+        val raw = exercises.map { it.source }.filter { it.isNotBlank() }.distinct()
+        sortSources((DISTRICT_ORDER + raw).distinct())
+    }
+    val availableTypes = remember(exercises) {
+        val raw = exercises.map { it.type }.filter { it.isNotBlank() }.distinct()
+        sortTypes((TYPE_ORDER + raw).distinct())
+    }
+
+    val filteredMatchingExercises = remember(matchingExercises, selectedYears, selectedSources, selectedGrades, selectedTypes) {
+        matchingExercises.filter {
+            (selectedYears.isEmpty() || selectedYears.contains(it.year)) &&
+            (selectedSources.isEmpty() || selectedSources.contains(it.source)) &&
+            (selectedGrades.isEmpty() || selectedGrades.contains(it.grade)) &&
+            (selectedTypes.isEmpty() || selectedTypes.contains(it.type))
         }
     }
 
@@ -324,50 +358,97 @@ fun SearchScreen(
                                     )
                                 )
                             }
-                        } else if (matchingExercises.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "没有找到匹配的试题",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
                         } else {
                             LazyColumn(
                                 state = exerciseListState,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                item {
+                                // 列表顶部的四个 Chips（学年、地区、年级、类别）
+                                item(key = "filter_chips") {
+                                    ExerciseFilterChipsRow(
+                                        selectedYears = selectedYears,
+                                        selectedSources = selectedSources,
+                                        selectedGrades = selectedGrades,
+                                        selectedTypes = selectedTypes,
+                                        onChipClick = { dimension ->
+                                            activeFilterDimension = dimension
+                                        },
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                                    )
+                                }
+
+                                item(key = "count_header") {
                                     Text(
-                                        text = "共 ${matchingExercises.size} 题",
+                                        text = "共 ${filteredMatchingExercises.size} 题",
                                         style = MaterialTheme.typography.titleSmall.copy(
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
-                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
                                     )
                                 }
 
-                                itemsIndexed(matchingExercises, key = { _, exercise -> exercise.id }) { index, exercise ->
-                                    val isFav = favoriteExerciseIds.contains(exercise.id)
-                                    ExerciseListRow(
-                                        exercise = exercise,
-                                        isFavorite = isFav,
-                                        onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
-                                        onClick = { onNavigateToExercise(exercise.id) },
-                                        highlightTerms = emptyList(),
-                                        showDivider = index < matchingExercises.size - 1
-                                    )
+                                if (filteredMatchingExercises.isEmpty()) {
+                                    item(key = "empty_result") {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(top = 48.dp),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Text(
+                                                text = if (matchingExercises.isEmpty()) "没有找到匹配的试题" else "暂无符合筛选条件的试题",
+                                                style = MaterialTheme.typography.bodyMedium.copy(
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    itemsIndexed(filteredMatchingExercises, key = { _, exercise -> exercise.id }) { index, exercise ->
+                                        val isFav = favoriteExerciseIds.contains(exercise.id)
+                                        ExerciseListRow(
+                                            exercise = exercise,
+                                            isFavorite = isFav,
+                                            onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
+                                            onClick = { onNavigateToExercise(exercise.id) },
+                                            highlightTerms = emptyList(),
+                                            showDivider = index < filteredMatchingExercises.size - 1
+                                        )
+                                    }
                                 }
 
-                                item { Spacer(modifier = Modifier.height(32.dp)) }
+                                item(key = "bottom_spacer") { Spacer(modifier = Modifier.height(32.dp)) }
                             }
                         }
                     }
                 }
             }
         }
+    }
+
+    if (activeFilterDimension != null) {
+        ExerciseFilterBottomSheet(
+            dimension = activeFilterDimension!!,
+            availableYears = availableYears,
+            availableSources = availableSources,
+            availableTypes = availableTypes,
+            selectedYears = selectedYears,
+            selectedSources = selectedSources,
+            selectedGrades = selectedGrades,
+            selectedTypes = selectedTypes,
+            onDismiss = { activeFilterDimension = null },
+            onApply = { years, sources, grades, types ->
+                selectedYears = years
+                selectedSources = sources
+                selectedGrades = grades
+                selectedTypes = types
+                activeFilterDimension = null
+                coroutineScope.launch {
+                    exerciseListState.scrollToItem(0, 0)
+                }
+            }
+        )
     }
 }
 
