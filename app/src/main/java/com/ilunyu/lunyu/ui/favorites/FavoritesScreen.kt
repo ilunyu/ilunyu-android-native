@@ -51,12 +51,19 @@ import com.ilunyu.lunyu.ui.reading.PianChapterRow
 import com.ilunyu.lunyu.ui.study.ExerciseFilterDimension
 import com.ilunyu.lunyu.ui.study.ExerciseFilterChipsRow
 import com.ilunyu.lunyu.ui.study.ExerciseFilterBottomSheet
+import com.ilunyu.lunyu.ui.study.ExerciseFilteredEmptyState
+import com.ilunyu.lunyu.ui.study.ExerciseTotalEmptyState
+import com.ilunyu.lunyu.ui.study.formatExerciseCountText
 import com.ilunyu.lunyu.ui.study.DISTRICT_ORDER
 import com.ilunyu.lunyu.ui.study.TYPE_ORDER
 import com.ilunyu.lunyu.ui.study.sortSources
 import com.ilunyu.lunyu.ui.study.sortTypes
 import com.ilunyu.lunyu.ui.study.ExerciseListRow
 import kotlinx.coroutines.launch
+
+// -------------------------------------------------------------
+// ...
+// -------------------------------------------------------------
 
 enum class FavoritesSortMode {
     DEFAULT,
@@ -134,9 +141,14 @@ fun FavoritesScreen(
         }
     }
 
+    // 收藏试题基础数据（未加四个维度筛选前）
+    val allFavoriteExercises = remember(favoriteExerciseIds, allExercises) {
+        allExercises.filter { favoriteExerciseIds.contains(it.id) }
+    }
+
     // 收藏试题数据过滤与排序
-    val favoriteExercises = remember(favoriteExerciseIds, allExercises, sortMode, selectedYears, selectedSources, selectedGrades, selectedTypes) {
-        val list = allExercises.filter { favoriteExerciseIds.contains(it.id) }
+    val favoriteExercises = remember(allFavoriteExercises, sortMode, selectedYears, selectedSources, selectedGrades, selectedTypes) {
+        val list = allFavoriteExercises
             .filter { selectedYears.isEmpty() || selectedYears.contains(it.year) }
             .filter { selectedSources.isEmpty() || selectedSources.contains(it.source) }
             .filter { selectedGrades.isEmpty() || selectedGrades.contains(it.grade) }
@@ -238,17 +250,7 @@ fun FavoritesScreen(
                 0 -> {
                     // 章节收藏列表
                     if (favoriteChapters.isEmpty()) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "暂无收藏的章节。",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            )
-                        }
+                        ExerciseTotalEmptyState(text = "暂无收藏的章节")
                     } else {
                         LazyColumn(
                             state = chapterListState,
@@ -284,25 +286,34 @@ fun FavoritesScreen(
                 }
                 1 -> {
                     // 试题收藏列表
-                    val hasAnyFavorites = favoriteExerciseIds.isNotEmpty()
-                    if (!hasAnyFavorites) {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "暂无收藏的试题。",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            )
-                        }
+                    if (allFavoriteExercises.isEmpty()) {
+                        // 总题目数为 0 时，全屏居中统一提示，不显示统计数据和筛选器行
+                        ExerciseTotalEmptyState(text = "暂无收藏的试题")
                     } else {
+                        val isFiltered = selectedYears.isNotEmpty() || selectedSources.isNotEmpty() || selectedGrades.isNotEmpty() || selectedTypes.isNotEmpty()
+                        val countText = formatExerciseCountText(
+                            filteredCount = favoriteExercises.size,
+                            totalCount = allFavoriteExercises.size,
+                            isFiltered = isFiltered
+                        )
+
                         LazyColumn(
                             state = exerciseListState,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            // 列表顶部的四个 Chips（学年、地区、年级、类别）
+                            // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
+                            item(key = "count_header") {
+                                Text(
+                                    text = countText,
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    ),
+                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 0.dp)
+                                )
+                            }
+
+                            // 2. 筛选器行：挪到“共 xx 题”下方，依次为学年、地区、年级、类别
                             item(key = "filter_chips") {
                                 ExerciseFilterChipsRow(
                                     selectedYears = selectedYears,
@@ -312,36 +323,14 @@ fun FavoritesScreen(
                                     onChipClick = { dimension ->
                                         activeFilterDimension = dimension
                                     },
-                                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                                )
-                            }
-
-                            item(key = "count_header") {
-                                Text(
-                                    text = "共 ${favoriteExercises.size} 题",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
+                                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                                 )
                             }
 
                             if (favoriteExercises.isEmpty()) {
+                                // 筛选出 0 题时，保留统计数据和筛选器行，在下方展示统一提示
                                 item(key = "empty_filtered") {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(top = 48.dp),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Text(
-                                            text = "暂无符合筛选条件的收藏试题",
-                                            style = MaterialTheme.typography.bodyMedium.copy(
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        )
-                                    }
+                                    ExerciseFilteredEmptyState(text = "暂无符合筛选条件的试题")
                                 }
                             } else {
                                 itemsIndexed(

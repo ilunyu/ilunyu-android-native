@@ -57,6 +57,9 @@ import com.ilunyu.lunyu.ui.reading.PianChapterRow
 import com.ilunyu.lunyu.ui.study.ExerciseFilterDimension
 import com.ilunyu.lunyu.ui.study.ExerciseFilterChipsRow
 import com.ilunyu.lunyu.ui.study.ExerciseFilterBottomSheet
+import com.ilunyu.lunyu.ui.study.ExerciseFilteredEmptyState
+import com.ilunyu.lunyu.ui.study.ExerciseTotalEmptyState
+import com.ilunyu.lunyu.ui.study.formatExerciseCountText
 import com.ilunyu.lunyu.ui.study.DISTRICT_ORDER
 import com.ilunyu.lunyu.ui.study.TYPE_ORDER
 import com.ilunyu.lunyu.ui.study.sortSources
@@ -299,23 +302,9 @@ fun SearchScreen(
                 when (page) {
                     0 -> {
                         if (queryTrimmed.isBlank()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "输入关键词搜索论语章节与试题",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
+                            ExerciseTotalEmptyState(text = "输入关键词搜索论语章节与试题")
                         } else if (matchingChapters.isEmpty()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "没有找到匹配的章节",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
+                            ExerciseTotalEmptyState(text = "没有找到匹配的章节")
                         } else {
                             LazyColumn(
                                 state = chapterListState,
@@ -350,20 +339,35 @@ fun SearchScreen(
                     }
                     1 -> {
                         if (queryTrimmed.isBlank()) {
-                            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "输入关键词搜索论语章节与试题",
-                                    style = MaterialTheme.typography.bodyMedium.copy(
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                )
-                            }
+                            ExerciseTotalEmptyState(text = "输入关键词搜索论语章节与试题")
+                        } else if (matchingExercises.isEmpty()) {
+                            // 搜索无匹配题目（总数为 0 时），全屏居中统一提示，不显示统计数据和筛选器行
+                            ExerciseTotalEmptyState(text = "没有找到匹配的试题")
                         } else {
+                            val isFiltered = selectedYears.isNotEmpty() || selectedSources.isNotEmpty() || selectedGrades.isNotEmpty() || selectedTypes.isNotEmpty()
+                            val countText = formatExerciseCountText(
+                                filteredCount = filteredMatchingExercises.size,
+                                totalCount = matchingExercises.size,
+                                isFiltered = isFiltered
+                            )
+
                             LazyColumn(
                                 state = exerciseListState,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                // 列表顶部的四个 Chips（学年、地区、年级、类别）
+                                // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
+                                item(key = "count_header") {
+                                    Text(
+                                        text = countText,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ),
+                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 0.dp)
+                                    )
+                                }
+
+                                // 2. 筛选器行：挪到“共 xx 题”下方，依次为学年、地区、年级、类别
                                 item(key = "filter_chips") {
                                     ExerciseFilterChipsRow(
                                         selectedYears = selectedYears,
@@ -373,36 +377,14 @@ fun SearchScreen(
                                         onChipClick = { dimension ->
                                             activeFilterDimension = dimension
                                         },
-                                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                                    )
-                                }
-
-                                item(key = "count_header") {
-                                    Text(
-                                        text = "共 ${filteredMatchingExercises.size} 题",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
+                                        modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                                     )
                                 }
 
                                 if (filteredMatchingExercises.isEmpty()) {
+                                    // 筛选出 0 题时，保留统计数据和筛选器行，在下方展示统一提示
                                     item(key = "empty_result") {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(top = 48.dp),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            Text(
-                                                text = if (matchingExercises.isEmpty()) "没有找到匹配的试题" else "暂无符合筛选条件的试题",
-                                                style = MaterialTheme.typography.bodyMedium.copy(
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                )
-                                            )
-                                        }
+                                        ExerciseFilteredEmptyState(text = "暂无符合筛选条件的试题")
                                     }
                                 } else {
                                     itemsIndexed(filteredMatchingExercises, key = { _, exercise -> exercise.id }) { index, exercise ->

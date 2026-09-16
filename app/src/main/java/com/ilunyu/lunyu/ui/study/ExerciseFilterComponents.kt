@@ -4,6 +4,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -71,29 +72,29 @@ val TYPE_ORDER = listOf(
 )
 
 /**
- * 按指定顺序对地区进行排序
+ * 地区排序比较器：优先按 DISTRICT_ORDER 顺序排，不在预设列表中的按字典序排在最后
  */
 fun sortSources(sources: Collection<String>): List<String> {
     val orderMap = DISTRICT_ORDER.withIndex().associate { it.value to it.index }
-    return sources.sortedWith(
-        compareBy<String> { orderMap[it] ?: (DISTRICT_ORDER.size + 1) }
-            .thenBy { it }
-    )
+    return sources.sortedWith(compareBy(
+        { orderMap[it] ?: Int.MAX_VALUE },
+        { it }
+    ))
 }
 
 /**
- * 按指定顺序对试卷类别进行排序
+ * 类别排序比较器：优先按 TYPE_ORDER 顺序排，不在预设列表中的按字典序排在最后
  */
 fun sortTypes(types: Collection<String>): List<String> {
     val orderMap = TYPE_ORDER.withIndex().associate { it.value to it.index }
-    return types.sortedWith(
-        compareBy<String> { orderMap[it] ?: (TYPE_ORDER.size + 1) }
-            .thenBy { it }
-    )
+    return types.sortedWith(compareBy(
+        { orderMap[it] ?: Int.MAX_VALUE },
+        { it }
+    ))
 }
 
 /**
- * 试题筛选维度定义
+ * 筛选器维度枚举
  */
 enum class ExerciseFilterDimension(val title: String) {
     YEAR("学年"),
@@ -103,10 +104,67 @@ enum class ExerciseFilterDimension(val title: String) {
 }
 
 /**
+ * 格式化题目计数文案：
+ * - 未筛选时：呈现 "共 xx 题"（总题目数）；
+ * - 筛选激活时：在前面加上筛选后计数，呈现为 "筛选出 xx 题·共 xx 题"（如 "筛选出 32 题·共 78 题"）。
+ */
+fun formatExerciseCountText(filteredCount: Int, totalCount: Int, isFiltered: Boolean): String {
+    return if (isFiltered) {
+        "筛选出 ${filteredCount} 题·共 ${totalCount} 题"
+    } else {
+        "共 ${totalCount} 题"
+    }
+}
+
+/**
+ * 筛选结果为空时下方统一提示组件：保证各页面字体风格、颜色、大小与间距完全一致
+ */
+@Composable
+fun ExerciseFilteredEmptyState(
+    text: String = "暂无符合筛选条件的试题",
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(top = 80.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+    }
+}
+
+/**
+ * 总题目数为 0 时全屏居中统一提示组件：保证各页面字体风格、颜色、大小与居中定位完全一致
+ */
+@Composable
+fun ExerciseTotalEmptyState(
+    text: String,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyLarge.copy(
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+    }
+}
+
+/**
  * 计算学年 Chip 文案：
  * - 未筛选：显示默认提示“学年”；
- * - 筛选 1 个：显示筛选内容（如“2024”）；
- * - 筛选多个：显示个数（如“2个学年”）。
+ * - 筛选 1 个：显示年份（如“2024”）；
+ * - 筛选多个：显示个数（如“2 个学年”）。
  */
 fun getYearChipLabel(selected: Set<String>): String = when {
     selected.isEmpty() -> "学年"
@@ -177,7 +235,7 @@ fun ExerciseFilterChipsRow(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 24.dp, vertical = 6.dp),
+            .padding(horizontal = 24.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {

@@ -131,74 +131,76 @@ fun StudyScreen(
             }
         )
 
-        // 2. 内容展示区（四个筛选 Chips 作为列表内容顶部的一部分，跟随列表整体平滑滚动）
+        // 2. 内容展示区
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                // 列表内容顶部的四个 Chips（依次为学年、地区、年级、类别，支持横向延伸滑动）
-                item(key = "filter_chips") {
-                    ExerciseFilterChipsRow(
-                        selectedYears = selectedYears,
-                        selectedSources = selectedSources,
-                        selectedGrades = selectedGrades,
-                        selectedTypes = selectedTypes,
-                        onChipClick = { dimension ->
-                            activeFilterDimension = dimension
-                        },
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
+            if (exercises.isEmpty()) {
+                // 总题目数为 0 时，全屏居中统一提示，不显示统计数据和筛选器行
+                ExerciseTotalEmptyState(text = "暂无试题")
+            } else {
+                val isFiltered = selectedYears.isNotEmpty() || selectedSources.isNotEmpty() || selectedGrades.isNotEmpty() || selectedTypes.isNotEmpty()
+                val countText = formatExerciseCountText(
+                    filteredCount = filteredExercises.size,
+                    totalCount = exercises.size,
+                    isFiltered = isFiltered
+                )
 
-                if (filteredExercises.isEmpty()) {
-                    item(key = "empty_state") {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 100.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "没有符合条件的题目。",
-                                style = MaterialTheme.typography.bodyLarge.copy(
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            )
-                        }
-                    }
-                } else {
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
                     item(key = "count_header") {
                         Text(
-                            text = "共 ${filteredExercises.size} 题",
+                            text = countText,
                             style = MaterialTheme.typography.titleSmall.copy(
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             ),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 8.dp, bottom = 12.dp)
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 0.dp)
                         )
                     }
 
-                    itemsIndexed(
-                        items = filteredExercises,
-                        key = { _, exercise -> exercise.id }
-                    ) { index, exercise ->
-                        val isFav = favoriteExerciseIds.contains(exercise.id)
-                        ExerciseListRow(
-                            exercise = exercise,
-                            isFavorite = isFav,
-                            onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
-                            onClick = { onNavigateToExercise(exercise.id) },
-                            showDivider = index < filteredExercises.size - 1
+                    // 2. 筛选器行：挪到“共 xx 题”下方，依次为学年、地区、年级、类别
+                    item(key = "filter_chips") {
+                        ExerciseFilterChipsRow(
+                            selectedYears = selectedYears,
+                            selectedSources = selectedSources,
+                            selectedGrades = selectedGrades,
+                            selectedTypes = selectedTypes,
+                            onChipClick = { dimension ->
+                                activeFilterDimension = dimension
+                            },
+                            modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
                         )
                     }
 
-                    item(key = "bottom_spacer") {
-                        Spacer(modifier = Modifier.height(48.dp))
+                    if (filteredExercises.isEmpty()) {
+                        // 筛选出 0 题时，保留统计数据和筛选器行，在下方展示统一提示
+                        item(key = "empty_state") {
+                            ExerciseFilteredEmptyState(text = "暂无符合筛选条件的试题")
+                        }
+                    } else {
+                        itemsIndexed(
+                            items = filteredExercises,
+                            key = { _, exercise -> exercise.id }
+                        ) { index, exercise ->
+                            val isFav = favoriteExerciseIds.contains(exercise.id)
+                            ExerciseListRow(
+                                exercise = exercise,
+                                isFavorite = isFav,
+                                onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
+                                onClick = { onNavigateToExercise(exercise.id) },
+                                showDivider = index < filteredExercises.size - 1
+                            )
+                        }
+
+                        item(key = "bottom_spacer") {
+                            Spacer(modifier = Modifier.height(48.dp))
+                        }
                     }
                 }
             }
