@@ -277,22 +277,26 @@ fun ExerciseDetailScreen(
                 }
             }
 
-            // 4. 答案与解析具体内容（滑入/滑出展开收起动画）
+            // 4. 答案与解析具体内容（伴随透明度淡入淡出与物理滑动的展开收起动画）
             item {
                 AnimatedVisibility(
                     visible = isAnswerExpanded,
-                    enter = expandVertically(
+                    enter = fadeIn(
+                        animationSpec = tween(durationMillis = 280, easing = FastOutSlowInEasing)
+                    ) + expandVertically(
                         expandFrom = Alignment.Top,
                         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
                     ) + slideInVertically(
-                        initialOffsetY = { -it },
+                        initialOffsetY = { -it / 4 },
                         animationSpec = tween(durationMillis = 300, easing = FastOutSlowInEasing)
                     ),
-                    exit = shrinkVertically(
+                    exit = fadeOut(
+                        animationSpec = tween(durationMillis = 200, easing = FastOutSlowInEasing)
+                    ) + shrinkVertically(
                         shrinkTowards = Alignment.Top,
                         animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
                     ) + slideOutVertically(
-                        targetOffsetY = { -it },
+                        targetOffsetY = { -it / 4 },
                         animationSpec = tween(durationMillis = 260, easing = FastOutSlowInEasing)
                     )
                 ) {
