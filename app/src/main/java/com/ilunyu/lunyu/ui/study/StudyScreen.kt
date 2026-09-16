@@ -68,11 +68,11 @@ fun StudyScreen(
     }
     val availableSources = remember(exercises) {
         val raw = exercises.map { it.source }.filter { it.isNotBlank() }.distinct()
-        sortSources(raw)
+        sortSources((DISTRICT_ORDER + raw).distinct())
     }
     val availableTypes = remember(exercises) {
         val raw = exercises.map { it.type }.filter { it.isNotBlank() }.distinct()
-        sortTypes(raw)
+        sortTypes((TYPE_ORDER + raw).distinct())
     }
 
     val filteredExercises = remember(exercises, selectedYears, selectedSources, selectedGrades, selectedTypes) {

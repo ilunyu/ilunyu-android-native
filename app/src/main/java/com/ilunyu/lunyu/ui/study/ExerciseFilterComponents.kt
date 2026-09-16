@@ -39,7 +39,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -290,6 +292,8 @@ fun ExerciseFilterBottomSheet(
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    val coroutineScope = rememberCoroutineScope()
+
     val currentHasSelection = when (dimension) {
         ExerciseFilterDimension.YEAR -> tempYears.isNotEmpty()
         ExerciseFilterDimension.SOURCE -> tempSources.isNotEmpty()
@@ -300,8 +304,12 @@ fun ExerciseFilterBottomSheet(
     val configuration = LocalConfiguration.current
     val maxSheetHeight = (configuration.screenHeightDp * 0.70f).dp
 
-    val sortedSources = remember(availableSources) { sortSources(availableSources) }
-    val sortedTypes = remember(availableTypes) { sortTypes(availableTypes) }
+    val sortedSources = remember(availableSources) {
+        sortSources((DISTRICT_ORDER + availableSources).distinct())
+    }
+    val sortedTypes = remember(availableTypes) {
+        sortTypes((TYPE_ORDER + availableTypes).distinct())
+    }
 
     val cardItems: List<FilterCardItem> = when (dimension) {
         ExerciseFilterDimension.YEAR -> availableYears.map { year ->
@@ -361,7 +369,7 @@ fun ExerciseFilterBottomSheet(
         },
         sheetState = sheetState,
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        containerColor = MaterialTheme.colorScheme.surface,
         dragHandle = { BottomSheetDefaults.DragHandle() }
     ) {
         Column(
@@ -446,8 +454,14 @@ fun ExerciseFilterBottomSheet(
             ) {
                 Button(
                     onClick = {
-                        onApply(tempYears, tempSources, tempGrades, tempTypes)
-                        onDismiss()
+                        coroutineScope.launch {
+                            sheetState.hide()
+                        }.invokeOnCompletion {
+                            if (!sheetState.isVisible) {
+                                onApply(tempYears, tempSources, tempGrades, tempTypes)
+                                onDismiss()
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
@@ -481,8 +495,8 @@ private data class FilterCardItem(
 /**
  * 筛选卡片组件：
  * 一行三个、圆角为 8px 的圆角矩形卡片；
- * 未选中为默认表面颜色，点按有水波纹（Surface 自带交互状态水波纹）；
- * 选中为青绿色加粗且左侧出现对勾 icon。
+ * 未选中为浅灰背景（surfaceContainerLow），无描边，点按有水波纹；
+ * 选中为浅青绿容器色（secondaryContainer 0.7 alpha），文字与对勾图标为青绿（primary）。
  */
 @Composable
 private fun FilterGridCard(
@@ -493,21 +507,14 @@ private fun FilterGridCard(
 ) {
     Surface(
         onClick = onToggle,
-        modifier = modifier.height(42.dp),
+        modifier = modifier.height(44.dp),
         shape = RoundedCornerShape(8.dp),
         color = if (isSelected) {
-            MaterialTheme.colorScheme.secondaryContainer
+            MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
         } else {
-            MaterialTheme.colorScheme.surface
+            MaterialTheme.colorScheme.surfaceContainerLow
         },
-        border = BorderStroke(
-            width = 1.dp,
-            color = if (isSelected) {
-                Color.Transparent
-            } else {
-                MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
-            }
-        )
+        border = null
     ) {
         Row(
             modifier = Modifier
