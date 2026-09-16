@@ -182,7 +182,7 @@ fun StudyScreen(
                     )
                 }
 
-                item { Spacer(modifier = Modifier.height(32.dp)) }
+                item { Spacer(modifier = Modifier.height(48.dp)) }
             }
         }
     }

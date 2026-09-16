@@ -4,10 +4,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationSpec
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.LocalOverscrollConfiguration
 import androidx.compose.foundation.background
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -315,7 +312,6 @@ fun LunyuTopBar(
  * - 向下滑动时，TopBar 从顶部落下，TabBar 同步下移，Content 同步下移，三者位移 1:1 绝对一致；
  * - 采用 placeWithLayer 进行纯 GPU 硬件图层平移，滚动过程中绝不触发全局重新测量 (Re-measure)，彻底消除重排抖动。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LunyuCollapsibleTabLayout(
     scrollState: LunyuTopBarScrollState,
@@ -350,11 +346,7 @@ fun LunyuCollapsibleTabLayout(
                     .fillMaxSize()
                     .clipToBounds()
             ) {
-                CompositionLocalProvider(
-                    LocalOverscrollConfiguration provides null
-                ) {
-                    content()
-                }
+                content()
             }
         },
         modifier = modifier
@@ -402,7 +394,6 @@ fun LunyuCollapsibleTabLayout(
  * - 顶栏在完全收起时位移为 -barHeightPx，展开时为 0；
  * - 采用 placeWithLayer 进行纯 GPU 硬件图层平移，不触发全局重新测量与重排。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LunyuCollapsibleSingleTopBarLayout(
     scrollState: LunyuTopBarScrollState,
@@ -428,11 +419,7 @@ fun LunyuCollapsibleSingleTopBarLayout(
                     .fillMaxSize()
                     .clipToBounds()
             ) {
-                CompositionLocalProvider(
-                    LocalOverscrollConfiguration provides null
-                ) {
-                    content()
-                }
+                content()
             }
         },
         modifier = modifier

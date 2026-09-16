@@ -316,7 +316,7 @@ fun ExerciseDetailScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(80.dp)) }
+            item { Spacer(modifier = Modifier.height(48.dp)) }
         }
     }
 }

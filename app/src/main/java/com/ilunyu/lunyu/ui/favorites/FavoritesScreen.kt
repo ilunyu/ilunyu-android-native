@@ -284,7 +284,7 @@ fun FavoritesScreen(
                                 )
                             }
 
-                            item { Spacer(modifier = Modifier.height(72.dp)) }
+                            item { Spacer(modifier = Modifier.height(48.dp)) }
                         }
                     }
                 }
@@ -332,7 +332,7 @@ fun FavoritesScreen(
                                 )
                             }
 
-                            item { Spacer(modifier = Modifier.height(72.dp)) }
+                            item { Spacer(modifier = Modifier.height(48.dp)) }
                         }
                     }
                 }

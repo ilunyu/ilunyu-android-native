@@ -442,7 +442,7 @@ fun ChapterScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                        .padding(start = 24.dp, end = 24.dp, bottom = 48.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -506,10 +506,6 @@ fun ChapterScreen(
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
-            }
-
-            item {
-                Spacer(modifier = Modifier.height(80.dp))
             }
         }
     }
