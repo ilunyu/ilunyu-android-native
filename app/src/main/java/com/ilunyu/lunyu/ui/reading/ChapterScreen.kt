@@ -24,8 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -36,11 +36,14 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Quiz
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.text.TextLayoutResult
+import kotlin.math.roundToInt
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
@@ -98,6 +101,7 @@ fun ChapterScreen(
     var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     val highlightProgress = remember(chapter.id) { Animatable(0f) }
     var highlightJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
+    var scrollJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
 
     LaunchedEffect(isCopied) {
         if (isCopied) {
@@ -106,18 +110,15 @@ fun ChapterScreen(
         }
     }
 
-    val lazyListState = rememberLazyListState(
-        initialFirstVisibleItemIndex = scrollIndex,
-        initialFirstVisibleItemScrollOffset = scrollOffset
-    )
-    LaunchedEffect(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset) {
-        onSaveScroll(lazyListState.firstVisibleItemIndex, lazyListState.firstVisibleItemScrollOffset)
+    val scrollState = rememberScrollState(initial = scrollOffset)
+    LaunchedEffect(scrollState.value) {
+        onSaveScroll(0, scrollState.value)
     }
 
-    val scrollState = rememberLunyuTopBarScrollState()
+    val topBarScrollState = rememberLunyuTopBarScrollState()
     val isScrolledUnder by remember {
         derivedStateOf {
-            lazyListState.firstVisibleItemIndex > 0 || lazyListState.firstVisibleItemScrollOffset > 0
+            scrollState.value > 0
         }
     }
 
@@ -126,24 +127,32 @@ fun ChapterScreen(
     LaunchedEffect(chapter.id) {
         highlightJob?.cancel()
         highlightJob = null
+        scrollJob?.cancel()
+        scrollJob = null
         highlightedAnnotationIndex = null
         highlightProgress.snapTo(0f)
         if (chapter.id != previousChapterId) {
             previousChapterId = chapter.id
-            scrollState.expand()
-            lazyListState.scrollToItem(0)
+            topBarScrollState.expand()
+            scrollState.scrollTo(0)
         }
     }
 
     // 列表滚动回最顶部时，保证顶栏完全展开
     LaunchedEffect(isScrolledUnder) {
-        if (!isScrolledUnder && !scrollState.isExpanded) {
-            scrollState.expand()
+        if (!isScrolledUnder && !topBarScrollState.isExpanded) {
+            topBarScrollState.expand()
         }
     }
 
+    val containerCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val originalTextCoordinates = remember { mutableStateOf<LayoutCoordinates?>(null) }
+    var textLayoutResult by remember(chapter.id) { mutableStateOf<TextLayoutResult?>(null) }
+    val annotationCoordinates = remember(chapter.id) { mutableMapOf<Int, LayoutCoordinates>() }
+    val annotationCharOffsets = remember(chapter.id) { mutableMapOf<Int, Int>() }
+
     LunyuCollapsibleTopBarLayout(
-        scrollState = scrollState,
+        scrollState = topBarScrollState,
         modifier = modifier.fillMaxSize(),
         topBar = {
             LunyuTopBar(
@@ -185,13 +194,18 @@ fun ChapterScreen(
             )
         }
     ) {
-        LazyColumn(
-            state = lazyListState,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .onGloballyPositioned { containerCoordinates.value = it }
         ) {
-            // 1. 原文部分（完全对齐 Flutter _ChapterReadingContentHeader）
-            // 段首带有 primary 色的 displayId（例如 "4·1 "），行内注释使用圆形角标 ①, ②...
-            item {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // 1. 原文部分（完全对齐 Flutter _ChapterReadingContentHeader）
+                // 段首带有 primary 色的 displayId（例如 "4·1 "），行内注释使用圆形角标 ①, ②...
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,11 +221,25 @@ fun ChapterScreen(
                             highlightJob = coroutineScope.launch {
                                 highlightedAnnotationIndex = noteNum
                                 highlightProgress.snapTo(1f)
-                                val noteIdx = chapter.annotations.indexOfFirst { it.index == noteNum }
-                                if (noteIdx >= 0) {
-                                    delay(80)
-                                    lazyListState.animateScrollToItem(3 + noteIdx)
+
+                                scrollJob?.cancel()
+                                scrollJob = coroutineScope.launch {
+                                    val containerCoords = containerCoordinates.value
+                                    val itemCoords = annotationCoordinates[noteNum]
+                                    val viewportHeight = containerCoords?.size?.height ?: 0
+
+                                    if (containerCoords != null && itemCoords != null && itemCoords.isAttached && containerCoords.isAttached && viewportHeight > 0) {
+                                        val itemPosInContainer = containerCoords.localPositionOf(itemCoords, Offset.Zero)
+                                        val itemCenterYInContainer = itemPosInContainer.y + itemCoords.size.height / 2f
+                                        val delta = itemCenterYInContainer - (viewportHeight / 2f)
+                                        val targetScrollY = (scrollState.value + delta).roundToInt().coerceIn(0, scrollState.maxValue)
+                                        scrollState.animateScrollTo(
+                                            targetScrollY,
+                                            animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                                        )
+                                    }
                                 }
+
                                 delay(500)
                                 highlightProgress.animateTo(
                                     targetValue = 0f,
@@ -219,10 +247,15 @@ fun ChapterScreen(
                                 )
                                 highlightedAnnotationIndex = null
                             }
+                        },
+                        onAnnotationOffsetRecorded = { noteNum, charOffset ->
+                            annotationCharOffsets[noteNum] = charOffset
                         }
                     )
                     Text(
                         text = originalAnnotated,
+                        onTextLayout = { textLayoutResult = it },
+                        modifier = Modifier.onGloballyPositioned { originalTextCoordinates.value = it },
                         style = MaterialTheme.typography.headlineSmall.copy(
                             fontSize = 24.sp,
                             lineHeight = 38.sp,
@@ -231,10 +264,8 @@ fun ChapterScreen(
                         )
                     )
                 }
-            }
 
-            // 2. 翻译板块
-            item {
+                // 2. 翻译板块
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -259,10 +290,8 @@ fun ChapterScreen(
                     )
                     Spacer(modifier = Modifier.height(48.dp))
                 }
-            }
 
-            // 3. 注释板块
-            item {
+                // 3. 注释板块
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -288,91 +317,114 @@ fun ChapterScreen(
                         Spacer(modifier = Modifier.height(48.dp))
                     }
                 }
-            }
 
-            if (chapter.annotations.isNotEmpty()) {
-                itemsIndexed(chapter.annotations, key = { _, note -> "note_${note.index}" }) { idx, note ->
-                    val isCurrentTarget = highlightedAnnotationIndex == note.index
-                    val progress = if (isCurrentTarget) highlightProgress.value else 0f
-                    val badgeBgColor = lerp(
-                        MaterialTheme.colorScheme.secondaryContainer,
-                        MaterialTheme.colorScheme.primary,
-                        progress
-                    )
-                    val badgeTextColor = lerp(
-                        MaterialTheme.colorScheme.onSecondaryContainer,
-                        MaterialTheme.colorScheme.onPrimary,
-                        progress
-                    )
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(
-                                start = 24.dp,
-                                end = 24.dp,
-                                bottom = if (idx == chapter.annotations.size - 1) 48.dp else 20.dp
-                            ),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        // 圆形序号徽标：点击返回原文，无需加高亮，水波纹严格呈圆形
-                        Surface(
-                            onClick = {
-                                highlightJob?.cancel()
-                                highlightJob = null
-                                highlightedAnnotationIndex = null
-                                coroutineScope.launch {
-                                    highlightProgress.snapTo(0f)
-                                    delay(100)
-                                    lazyListState.animateScrollToItem(0)
-                                }
-                            },
-                            shape = CircleShape,
-                            color = badgeBgColor,
-                            modifier = Modifier.size(28.dp)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "${note.index}",
-                                    style = MaterialTheme.typography.labelSmall.copy(
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = badgeTextColor
-                                    )
-                                )
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.width(12.dp))
-
-                        val noteAnnotated = buildAnnotatedString {
-                            if (note.label.isNotBlank()) {
-                                withStyle(
-                                    SpanStyle(
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                ) {
-                                    append("${note.label}　")
-                                }
-                            }
-                            append(note.text)
-                        }
-
-                        Text(
-                            text = noteAnnotated,
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontSize = 16.sp,
-                                lineHeight = 28.sp,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier.weight(1f)
+                if (chapter.annotations.isNotEmpty()) {
+                    chapter.annotations.forEachIndexed { idx, note ->
+                        val isCurrentTarget = highlightedAnnotationIndex == note.index
+                        val progress = if (isCurrentTarget) highlightProgress.value else 0f
+                        val badgeBgColor = lerp(
+                            MaterialTheme.colorScheme.secondaryContainer,
+                            MaterialTheme.colorScheme.primary,
+                            progress
                         )
+                        val badgeTextColor = lerp(
+                            MaterialTheme.colorScheme.onSecondaryContainer,
+                            MaterialTheme.colorScheme.onPrimary,
+                            progress
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onGloballyPositioned { coords ->
+                                    annotationCoordinates[note.index] = coords
+                                }
+                                .padding(
+                                    start = 24.dp,
+                                    end = 24.dp,
+                                    bottom = if (idx == chapter.annotations.size - 1) 48.dp else 20.dp
+                                ),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            // 圆形序号徽标：点击返回原文，无需加高亮，水波纹严格呈圆形
+                            Surface(
+                                onClick = {
+                                    highlightJob?.cancel()
+                                    highlightJob = null
+                                    highlightedAnnotationIndex = null
+                                    scrollJob?.cancel()
+                                    scrollJob = coroutineScope.launch {
+                                        highlightProgress.snapTo(0f)
+
+                                        val charOffset = annotationCharOffsets[note.index]
+                                        val layout = textLayoutResult
+                                        val textCoords = originalTextCoordinates.value
+                                        val containerCoords = containerCoordinates.value
+                                        val viewportHeight = containerCoords?.size?.height ?: 0
+
+                                        if (charOffset != null && layout != null && textCoords != null && containerCoords != null && textCoords.isAttached && containerCoords.isAttached && viewportHeight > 0) {
+                                            val charBounds = layout.getBoundingBox(charOffset)
+                                            val charCenterInText = Offset(
+                                                (charBounds.left + charBounds.right) / 2f,
+                                                (charBounds.top + charBounds.bottom) / 2f
+                                            )
+                                            val charPosInContainer = containerCoords.localPositionOf(textCoords, charCenterInText)
+                                            val delta = charPosInContainer.y - (viewportHeight / 2f)
+                                            val targetScrollY = (scrollState.value + delta).roundToInt().coerceIn(0, scrollState.maxValue)
+                                            scrollState.animateScrollTo(
+                                                targetScrollY,
+                                                animationSpec = tween(durationMillis = 500, easing = FastOutSlowInEasing)
+                                            )
+                                        } else {
+                                            scrollState.animateScrollTo(0)
+                                        }
+                                    }
+                                },
+                                shape = CircleShape,
+                                color = badgeBgColor,
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = "${note.index}",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = badgeTextColor
+                                        )
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            val noteAnnotated = buildAnnotatedString {
+                                if (note.label.isNotBlank()) {
+                                    withStyle(
+                                        SpanStyle(
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    ) {
+                                        append("${note.label}　")
+                                    }
+                                }
+                                append(note.text)
+                            }
+
+                            Text(
+                                text = noteAnnotated,
+                                style = MaterialTheme.typography.bodyLarge.copy(
+                                    fontSize = 16.sp,
+                                    lineHeight = 28.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                ),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
                     }
                 }
-            }
 
-            // 4. 关联题目板块
-            item {
+                // 4. 关联题目板块
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -435,10 +487,8 @@ fun ChapterScreen(
                     }
                     Spacer(modifier = Modifier.height(48.dp))
                 }
-            }
 
-            // 5. 胶囊切章导航（完全对齐 Flutter _AndroidChapterSequenceNavigation）
-            item {
+                // 5. 胶囊切章导航（完全对齐 Flutter _AndroidChapterSequenceNavigation）
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

@@ -144,7 +144,8 @@ fun formatChapterOriginalText(
     displayId: String,
     rawText: String,
     primaryColor: androidx.compose.ui.graphics.Color,
-    onAnnotationClick: ((Int) -> Unit)? = null
+    onAnnotationClick: ((Int) -> Unit)? = null,
+    onAnnotationOffsetRecorded: ((Int, Int) -> Unit)? = null
 ): AnnotatedString {
     return buildAnnotatedString {
         // 章节编号
@@ -177,11 +178,15 @@ fun formatChapterOriginalText(
                     }
                 )
                 pushLink(link)
+                val start = this.length
                 append(circled)
+                onAnnotationOffsetRecorded?.invoke(num, start)
                 pop()
             } else {
                 pushStyle(SpanStyle(color = primaryColor, fontWeight = FontWeight.Normal))
+                val start = this.length
                 append(circled)
+                onAnnotationOffsetRecorded?.invoke(num, start)
                 pop()
             }
             cursor = match.range.last + 1
