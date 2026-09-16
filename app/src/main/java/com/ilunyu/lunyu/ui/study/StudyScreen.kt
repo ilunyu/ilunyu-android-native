@@ -14,14 +14,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.derivedStateOf
+import androidx.compose.ui.graphics.Color
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -59,13 +60,8 @@ fun StudyScreen(
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showFilterDialog by remember { mutableStateOf(false) }
+    var activeFilterDimension by remember { mutableStateOf<ExerciseFilterDimension?>(null) }
     val coroutineScope = rememberCoroutineScope()
-
-    val hasActiveFilters = selectedYears.isNotEmpty() ||
-            selectedSources.isNotEmpty() ||
-            selectedGrades.isNotEmpty() ||
-            selectedTypes.isNotEmpty()
 
     val availableYears = remember(exercises) {
         exercises.map { it.year }.filter { it.isNotBlank() }.distinct().sortedDescending()
@@ -111,23 +107,10 @@ fun StudyScreen(
             .background(MaterialTheme.colorScheme.surface)
             .statusBarsPadding()
     ) {
+        // 1. 顶栏：移除左上角图标，仅保留右侧搜索按钮
         LunyuTopBar(
-            showDivider = isScrolledUnder,
-            navigationIcon = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    // 筛选按钮（左侧）
-                    IconButton(onClick = { showFilterDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Default.FilterList,
-                            contentDescription = "筛选题目",
-                            tint = if (hasActiveFilters) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            },
+            showDivider = false,
             actions = {
-                // 搜索按钮（右侧）
                 IconButton(onClick = onNavigateToSearch) {
                     Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
                 }
@@ -135,72 +118,92 @@ fun StudyScreen(
             }
         )
 
+        // 2. 列表与统计信息上方的四个 Chips（依次为学年、地区、年级、类别，支持横向延伸滑动）
+        ExerciseFilterChipsRow(
+            selectedYears = selectedYears,
+            selectedSources = selectedSources,
+            selectedGrades = selectedGrades,
+            selectedTypes = selectedTypes,
+            onChipClick = { dimension ->
+                activeFilterDimension = dimension
+            }
+        )
+
+        // 3. 滚动到底部分割线（跟随内容滚动状态）
+        HorizontalDivider(
+            thickness = 1.dp,
+            color = if (isScrolledUnder) MaterialTheme.colorScheme.outlineVariant else Color.Transparent
+        )
+
+        // 4. 内容展示区
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .weight(1f)
         ) {
-        if (filteredExercises.isEmpty()) {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "没有符合条件的题目。",
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                )
-            }
-        } else {
-            LazyColumn(
-                state = lazyListState,
-                modifier = Modifier.fillMaxSize()
-            ) {
-                item {
+            if (filteredExercises.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
                     Text(
-                        text = "共 ${filteredExercises.size} 题",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold,
+                        text = "没有符合条件的题目。",
+                        style = MaterialTheme.typography.bodyLarge.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
-                        ),
-                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                        )
                     )
                 }
+            } else {
+                LazyColumn(
+                    state = lazyListState,
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    item {
+                        Text(
+                            text = "共 ${filteredExercises.size} 题",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 12.dp)
+                        )
+                    }
 
-                itemsIndexed(
-                    items = filteredExercises,
-                    key = { _, exercise -> exercise.id }
-                ) { index, exercise ->
-                    val isFav = favoriteExerciseIds.contains(exercise.id)
-                    ExerciseListRow(
-                        exercise = exercise,
-                        isFavorite = isFav,
-                        onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
-                        onClick = { onNavigateToExercise(exercise.id) },
-                        showDivider = index < filteredExercises.size - 1
-                    )
+                    itemsIndexed(
+                        items = filteredExercises,
+                        key = { _, exercise -> exercise.id }
+                    ) { index, exercise ->
+                        val isFav = favoriteExerciseIds.contains(exercise.id)
+                        ExerciseListRow(
+                            exercise = exercise,
+                            isFavorite = isFav,
+                            onToggleFavorite = { onToggleExerciseFavorite(exercise.id) },
+                            onClick = { onNavigateToExercise(exercise.id) },
+                            showDivider = index < filteredExercises.size - 1
+                        )
+                    }
+
+                    item { Spacer(modifier = Modifier.height(48.dp)) }
                 }
-
-                item { Spacer(modifier = Modifier.height(48.dp)) }
             }
         }
     }
-}
 
-    if (showFilterDialog) {
-        ExerciseFilterDialog(
+    // 5. 底部多选列表 BottomSheet 容器
+    if (activeFilterDimension != null) {
+        ExerciseFilterBottomSheet(
+            dimension = activeFilterDimension!!,
             availableYears = availableYears,
             availableSources = availableSources,
             availableTypes = availableTypes,
-            initialYears = selectedYears,
-            initialSources = selectedSources,
-            initialGrades = selectedGrades,
-            initialTypes = selectedTypes,
-            onDismiss = { showFilterDialog = false },
+            selectedYears = selectedYears,
+            selectedSources = selectedSources,
+            selectedGrades = selectedGrades,
+            selectedTypes = selectedTypes,
+            onDismiss = { activeFilterDimension = null },
             onApply = { years, sources, grades, types ->
                 onUpdateFilters(years, sources, grades, types)
-                showFilterDialog = false
+                activeFilterDimension = null
                 coroutineScope.launch {
                     lazyListState.scrollToItem(0, 0)
                 }

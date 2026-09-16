@@ -1,6 +1,10 @@
 package com.ilunyu.lunyu
 
 import com.ilunyu.lunyu.ui.favorites.FavoritesSortMode
+import com.ilunyu.lunyu.ui.study.getGradeChipLabel
+import com.ilunyu.lunyu.ui.study.getSourceChipLabel
+import com.ilunyu.lunyu.ui.study.getTypeChipLabel
+import com.ilunyu.lunyu.ui.study.getYearChipLabel
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
@@ -161,5 +165,31 @@ class ScrollAndFilterStateTest {
             assertEquals(maxHeight - tabBarHeight, contentHeight)
             assertEquals(maxHeight, contentTop + contentHeight)
         }
+    }
+
+    @Test
+    fun testExerciseFilterChipLabels() {
+        // 学年
+        assertEquals("学年", getYearChipLabel(emptySet<String>()))
+        assertEquals("2024", getYearChipLabel(setOf("2024")))
+        assertEquals("2个学年", getYearChipLabel(setOf("2023", "2024")))
+
+        // 地区
+        assertEquals("地区", getSourceChipLabel(emptySet<String>()))
+        assertEquals("东城", getSourceChipLabel(setOf("东城")))
+        assertEquals("3个地区", getSourceChipLabel(setOf("东城", "西城", "海淀")))
+
+        // 年级
+        assertEquals("年级", getGradeChipLabel(emptySet<Int>()))
+        assertEquals("高一", getGradeChipLabel(setOf(1)))
+        assertEquals("高二", getGradeChipLabel(setOf(2)))
+        assertEquals("高三", getGradeChipLabel(setOf(3)))
+        assertEquals("2个年级", getGradeChipLabel(setOf(1, 2)))
+        assertEquals("全部年级", getGradeChipLabel(setOf(1, 2, 3)))
+
+        // 类别
+        assertEquals("类别", getTypeChipLabel(emptySet<String>()))
+        assertEquals("期末", getTypeChipLabel(setOf("期末")))
+        assertEquals("4类试卷", getTypeChipLabel(setOf("期末", "期中", "模拟", "练习")))
     }
 }
