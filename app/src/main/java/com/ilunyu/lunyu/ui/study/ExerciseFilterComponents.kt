@@ -8,9 +8,11 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -253,6 +255,9 @@ fun ExerciseFilterBottomSheet(
         ExerciseFilterDimension.TYPE -> tempTypes.isNotEmpty()
     }
 
+    val configuration = LocalConfiguration.current
+    val maxSheetHeight = (configuration.screenHeightDp * 0.70f).dp
+
     ModalBottomSheet(
         onDismissRequest = {
             onApply(tempYears, tempSources, tempGrades, tempTypes)
@@ -266,6 +271,7 @@ fun ExerciseFilterBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .heightIn(max = maxSheetHeight)
                 .padding(bottom = 12.dp)
         ) {
             // 顶栏：标题与重置按钮
