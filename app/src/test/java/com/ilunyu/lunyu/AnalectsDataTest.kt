@@ -51,7 +51,7 @@ class AnalectsDataTest {
         val content = file.readText()
         val index = json.decodeFromString<ExerciseIndex>(content)
 
-        assertEquals(72, index.exercises.size)
+        assertEquals(82, index.exercises.size)
 
         val years = index.exercises.map { it.year }.filter { it.isNotBlank() }.distinct()
         val sources = index.exercises.map { it.source }.filter { it.isNotBlank() }.distinct()
