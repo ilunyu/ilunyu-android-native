@@ -81,6 +81,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun reorderItemTags(targetType: String, targetId: String, orderedTagIds: List<String>) {
+        viewModelScope.launch {
+            tagRepo.reorderItemTags(targetType, targetId, orderedTagIds)
+        }
+    }
+
     val themeMode: StateFlow<AppThemeMode> = userPrefs.themeModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppThemeMode.SYSTEM)
 

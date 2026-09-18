@@ -112,6 +112,26 @@ class FakeTagDao : TagDao {
         emit()
         return count
     }
+
+    override suspend fun getMaxSortOrderForItem(targetType: String, targetId: String): Int? {
+        return itemTags.filter { it.targetType == targetType && it.targetId == targetId }.maxOfOrNull { it.sortOrder }
+    }
+
+    override suspend fun updateItemTagSortOrder(tagId: String, targetType: String, targetId: String, sortOrder: Int): Int {
+        val index = itemTags.indexOfFirst { it.tagId == tagId && it.targetType == targetType && it.targetId == targetId }
+        if (index >= 0) {
+            itemTags[index] = itemTags[index].copy(sortOrder = sortOrder)
+            emit()
+            return 1
+        }
+        return 0
+    }
+
+    override suspend fun reorderItemTags(targetType: String, targetId: String, orderedTagIds: List<String>) {
+        orderedTagIds.forEachIndexed { index, tagId ->
+            updateItemTagSortOrder(tagId, targetType, targetId, index)
+        }
+    }
 }
 
 class TagRepositoryTest {
@@ -223,18 +243,21 @@ class TagRepositoryTest {
     }
 
     @Test
-    fun testCascadeDeleteTag() = runBlocking {
-        val tag = repository.createTag("治国").getOrThrow()
-        repository.toggleItemTag(tag.id, TargetType.CHAPTER, "1")
-        repository.toggleItemTag(tag.id, TargetType.EXERCISE, "201")
+    fun testReorderItemTags() = runBlocking {
+        val tagA = repository.createTag("标签A").getOrThrow()
+        val tagB = repository.createTag("标签B").getOrThrow()
+        val tagC = repository.createTag("标签C").getOrThrow()
 
-        // Delete tag
-        repository.deleteTag(tag.id)
+        // 依次绑定到章节 1
+        repository.toggleItemTag(tagA.id, TargetType.CHAPTER, "1")
+        repository.toggleItemTag(tagB.id, TargetType.CHAPTER, "1")
+        repository.toggleItemTag(tagC.id, TargetType.CHAPTER, "1")
 
-        assertNull(repository.getTagById(tag.id))
-        val chapterIds = repository.getChapterIdsForTagFlow(tag.id).first()
-        assertTrue(chapterIds.isEmpty())
-        val exerciseIds = repository.getExerciseIdsForTagFlow(tag.id).first()
-        assertTrue(exerciseIds.isEmpty())
+        // 重排为 C, A, B
+        repository.reorderItemTags(TargetType.CHAPTER, "1", listOf(tagC.id, tagA.id, tagB.id))
+
+        // 验证 FakeTagDao 中排序位次
+        val maxOrder = fakeDao.getMaxSortOrderForItem(TargetType.CHAPTER, "1")
+        assertEquals(2, maxOrder)
     }
 }

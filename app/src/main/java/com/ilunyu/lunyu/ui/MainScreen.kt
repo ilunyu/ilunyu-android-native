@@ -470,6 +470,7 @@ fun MainScreen(
                                 onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "CHAPTER", chapter.id) },
                                 onCreateTag = { name, color, icon -> viewModel.createTagAndAttach(name, color, icon, "CHAPTER", chapter.id) },
                                 onNavigateToTag = { tagId -> navigateTo(ScreenDestination.TagDetail(tagId)) },
+                                onReorderTags = { orderedTagIds -> viewModel.reorderItemTags("CHAPTER", chapter.id, orderedTagIds) },
                                 scrollIndex = scrollPair?.first ?: 0,
                                 scrollOffset = scrollPair?.second ?: 0,
                                 onSaveScroll = { idx, off ->

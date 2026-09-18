@@ -42,7 +42,7 @@ interface TagDao {
         SELECT t.* FROM tags t
         INNER JOIN item_tags it ON t.id = it.tag_id
         WHERE it.target_type = :targetType AND it.target_id = :targetId
-        ORDER BY t.sort_order ASC, t.created_at DESC
+        ORDER BY it.sort_order ASC, it.created_at ASC
     """)
     fun getTagsForItemFlow(targetType: String, targetId: String): Flow<List<TagEntity>>
 
@@ -69,4 +69,17 @@ interface TagDao {
 
     @Query("DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM item_tags)")
     suspend fun deleteOrphanTags(): Int
+
+    @Query("SELECT MAX(sort_order) FROM item_tags WHERE target_type = :targetType AND target_id = :targetId")
+    suspend fun getMaxSortOrderForItem(targetType: String, targetId: String): Int?
+
+    @Query("UPDATE item_tags SET sort_order = :sortOrder WHERE tag_id = :tagId AND target_type = :targetType AND target_id = :targetId")
+    suspend fun updateItemTagSortOrder(tagId: String, targetType: String, targetId: String, sortOrder: Int): Int
+
+    @Transaction
+    suspend fun reorderItemTags(targetType: String, targetId: String, orderedTagIds: List<String>) {
+        orderedTagIds.forEachIndexed { index, tagId ->
+            updateItemTagSortOrder(tagId, targetType, targetId, index)
+        }
+    }
 }

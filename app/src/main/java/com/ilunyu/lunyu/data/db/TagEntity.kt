@@ -53,6 +53,8 @@ data class ItemTagCrossRef(
     val targetType: String,
     @ColumnInfo(name = "target_id")
     val targetId: String,
+    @ColumnInfo(name = "sort_order")
+    val sortOrder: Int = 0,
     @ColumnInfo(name = "created_at")
     val createdAt: Long = System.currentTimeMillis()
 )

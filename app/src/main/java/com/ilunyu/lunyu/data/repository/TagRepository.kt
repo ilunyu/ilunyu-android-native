@@ -176,7 +176,7 @@ class TagRepository(private val tagDao: TagDao) {
     }
 
     /**
-     * 创建标签并立即与目标章节/试题关联
+     * 创建标签并立即与目标章节/试题关联（新标签排在最后）
      */
     suspend fun createAndAttachTag(
         name: String,
@@ -187,7 +187,15 @@ class TagRepository(private val tagDao: TagDao) {
     ): Result<TagEntity> = withContext(Dispatchers.IO) {
         val result = createTag(name, colorHex, icon)
         result.onSuccess { newTag ->
-            tagDao.insertItemTag(ItemTagCrossRef(tagId = newTag.id, targetType = targetType, targetId = targetId))
+            val maxOrder = tagDao.getMaxSortOrderForItem(targetType, targetId) ?: -1
+            tagDao.insertItemTag(
+                ItemTagCrossRef(
+                    tagId = newTag.id,
+                    targetType = targetType,
+                    targetId = targetId,
+                    sortOrder = maxOrder + 1
+                )
+            )
         }
         result
     }
@@ -201,7 +209,9 @@ class TagRepository(private val tagDao: TagDao) {
 
     /**
      * 切换章节或试题对某一标签的关联状态（打标 / 去除打标）
-     * 规则：如果解绑后该标签所有关联的章节和试题都没了（计数为 0），则自动彻底删除该标签！
+     * 规则：
+     * - 如果解绑后该标签所有关联的章节和试题都没了（计数为 0），则自动彻底删除该标签！
+     * - 如果新增打标，默认排在末尾（sortOrder = maxOrder + 1）
      */
     suspend fun toggleItemTag(tagId: String, targetType: String, targetId: String) = withContext(Dispatchers.IO) {
         val hasTag = tagDao.hasItemTag(tagId, targetType, targetId)
@@ -212,8 +222,23 @@ class TagRepository(private val tagDao: TagDao) {
                 tagDao.deleteTagEntity(tagId)
             }
         } else {
-            tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId))
+            val maxOrder = tagDao.getMaxSortOrderForItem(targetType, targetId) ?: -1
+            tagDao.insertItemTag(
+                ItemTagCrossRef(
+                    tagId = tagId,
+                    targetType = targetType,
+                    targetId = targetId,
+                    sortOrder = maxOrder + 1
+                )
+            )
         }
+    }
+
+    /**
+     * 为指定章节或试题下的标签重排顺序
+     */
+    suspend fun reorderItemTags(targetType: String, targetId: String, orderedTagIds: List<String>) = withContext(Dispatchers.IO) {
+        tagDao.reorderItemTags(targetType, targetId, orderedTagIds)
     }
 
     /**
@@ -227,8 +252,9 @@ class TagRepository(private val tagDao: TagDao) {
      * 批量为章节或试题设置标签
      */
     suspend fun setItemTags(targetType: String, targetId: String, tagIds: Set<String>) = withContext(Dispatchers.IO) {
+        var order = 0
         for (tagId in tagIds) {
-            tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId))
+            tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId, sortOrder = order++))
         }
     }
 }
