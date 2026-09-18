@@ -58,14 +58,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun createTagAndAttach(name: String, colorHex: String? = null, icon: String? = null, targetType: String, targetId: String) {
         viewModelScope.launch {
-            val result = tagRepo.createTag(name, colorHex, icon)
-            result.onSuccess { newTag ->
-                tagRepo.toggleItemTag(newTag.id, targetType, targetId)
-            }
+            tagRepo.createAndAttachTag(name, colorHex, icon, targetType, targetId)
         }
     }
 
-    fun updateTag(tagId: String, name: String, colorHex: String, icon: String? = null, onResult: (Result<Unit>) -> Unit = {}) {
+    fun updateTag(tagId: String, name: String, colorHex: String? = null, icon: String? = null, onResult: (Result<Unit>) -> Unit = {}) {
         viewModelScope.launch {
             val result = tagRepo.updateTag(tagId, name, colorHex, icon)
             onResult(result)

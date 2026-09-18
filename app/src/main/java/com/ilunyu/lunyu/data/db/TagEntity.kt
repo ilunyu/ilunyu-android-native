@@ -18,7 +18,7 @@ data class TagEntity(
     val id: String = UUID.randomUUID().toString(),
     val name: String,
     @ColumnInfo(name = "color_hex")
-    val colorHex: String = "#008080", // 默认黛绿 (Teal)
+    val colorHex: String? = null, // 代表色彩：自选或空
     @ColumnInfo(name = "icon")
     val icon: String? = null, // 代表图标：star, person, lightbulb, question_answer
     @ColumnInfo(name = "sort_order")

@@ -100,6 +100,18 @@ class FakeTagDao : TagDao {
             list.count { it.tagId == tagId && it.targetType == targetType }
         }
     }
+
+    override suspend fun countAllItemsForTag(tagId: String): Int {
+        return itemTags.count { it.tagId == tagId }
+    }
+
+    override suspend fun deleteOrphanTags(): Int {
+        val activeTagIds = itemTags.map { it.tagId }.toSet()
+        val count = tags.count { !activeTagIds.contains(it.id) }
+        tags.removeAll { !activeTagIds.contains(it.id) }
+        emit()
+        return count
+    }
 }
 
 class TagRepositoryTest {
@@ -119,7 +131,9 @@ class TagRepositoryTest {
         assertTrue(createResult.isSuccess)
         val tag = createResult.getOrThrow()
         assertEquals("中庸", tag.name)
-        assertNotNull(tag.colorHex)
+        // 规则 3：用户未设置颜色和图标时，均为 null（展示为最普通的纯文本 label）
+        assertNull(tag.colorHex)
+        assertNull(tag.icon)
 
         // Duplicate check
         val duplicateResult = repository.createTag("中庸")
@@ -134,11 +148,19 @@ class TagRepositoryTest {
         val longResult = repository.createTag("这是一段超过十个字符的标签名称")
         assertTrue(longResult.isFailure)
 
-        // Create with icon
+        // 规则 3：颜色与图标二选一（互斥）。若同时传入，优先保留图标，颜色置 null
         val iconResult = repository.createTag("仁者爱人", "#C04851", "star")
         assertTrue(iconResult.isSuccess)
         val iconTag = iconResult.getOrThrow()
         assertEquals("star", iconTag.icon)
+        assertNull(iconTag.colorHex)
+
+        // 仅设置颜色时，icon 为 null
+        val colorResult = repository.createTag("克己复礼", "#2F72B5", null)
+        assertTrue(colorResult.isSuccess)
+        val colorTag = colorResult.getOrThrow()
+        assertEquals("#2F72B5", colorTag.colorHex)
+        assertNull(colorTag.icon)
     }
 
     @Test
@@ -153,6 +175,7 @@ class TagRepositoryTest {
         assertNotNull(fetched)
         assertEquals("格物", fetched!!.name)
         assertEquals("#C04851", fetched.colorHex)
+        assertNull(fetched.icon)
 
         // Cannot rename to tag2's name (duplicate)
         val duplicateRename = repository.updateTag(tag1.id, "齐家", "#C04851")
@@ -175,11 +198,28 @@ class TagRepositoryTest {
         assertEquals(1, tagWithCount.chapterCount)
         assertEquals(1, tagWithCount.exerciseCount)
 
-        // Untag chapter 1
+        // Untag chapter 1 (still has exercise 101, so not deleted)
         repository.toggleItemTag(tag.id, TargetType.CHAPTER, "1")
         val updatedCounts = repository.allTagsWithCountsFlow.first()
         assertEquals(0, updatedCounts.first().chapterCount)
         assertEquals(1, updatedCounts.first().exerciseCount)
+
+        // 规则 4：Untag exercise 101 (关联全无，标签自动删除)
+        repository.toggleItemTag(tag.id, TargetType.EXERCISE, "101")
+        assertNull(repository.getTagById(tag.id))
+        val emptyList = repository.allTagsWithCountsFlow.first()
+        assertTrue(emptyList.isEmpty())
+    }
+
+    @Test
+    fun testOrphanTagAutoDeleted() = runBlocking {
+        val tag = repository.createTag("学而").getOrThrow()
+        repository.toggleItemTag(tag.id, TargetType.CHAPTER, "1")
+        assertNotNull(repository.getTagById(tag.id))
+
+        // 解绑后立即触发孤儿删除
+        repository.toggleItemTag(tag.id, TargetType.CHAPTER, "1")
+        assertNull(repository.getTagById(tag.id))
     }
 
     @Test

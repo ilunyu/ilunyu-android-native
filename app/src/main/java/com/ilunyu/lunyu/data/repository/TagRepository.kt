@@ -87,7 +87,9 @@ class TagRepository(private val tagDao: TagDao) {
     }
 
     /**
-     * 创建新标签（支持防重名校验与颜色自动轮转分配）
+     * 创建新标签：
+     * - 名称去前后空格、去 # 前缀、校验空与长度（<=10）
+     * - 颜色与图标二选一（互斥）；若用户均未设置，则均为 null（普通纯文本 label）
      */
     suspend fun createTag(
         name: String,
@@ -107,28 +109,36 @@ class TagRepository(private val tagDao: TagDao) {
             return@withContext Result.failure(IllegalStateException("已存在同名标签：$trimmedName"))
         }
 
-        val color = colorHex ?: run {
-            // 根据已有标签数量顺延分配预设色彩
-            val hash = Math.abs(trimmedName.hashCode())
-            TAG_PRESET_COLORS[hash % TAG_PRESET_COLORS.size]
+        // 颜色与图标只能二选一：若设置了图标，则颜色为 null；若设置了颜色，则图标为 null；若均未设置，则均为 null
+        val finalIcon: String?
+        val finalColorHex: String?
+        if (!icon.isNullOrBlank()) {
+            finalIcon = icon
+            finalColorHex = null
+        } else if (!colorHex.isNullOrBlank()) {
+            finalIcon = null
+            finalColorHex = colorHex
+        } else {
+            finalIcon = null
+            finalColorHex = null
         }
 
         val newTag = TagEntity(
             name = trimmedName,
-            colorHex = color,
-            icon = icon
+            colorHex = finalColorHex,
+            icon = finalIcon
         )
         tagDao.insertTag(newTag)
         Result.success(newTag)
     }
 
     /**
-     * 重命名标签或修改标签主题色与图标
+     * 重命名标签或修改标签主题色与图标（同样严格保持颜色与图标二选一）
      */
     suspend fun updateTag(
         tagId: String,
         name: String,
-        colorHex: String,
+        colorHex: String? = null,
         icon: String? = null
     ): Result<Unit> = withContext(Dispatchers.IO) {
         val trimmedName = name.trim().removePrefix("#").trim()
@@ -147,9 +157,39 @@ class TagRepository(private val tagDao: TagDao) {
             return@withContext Result.failure(IllegalStateException("已存在同名标签：$trimmedName"))
         }
 
-        val updated = current.copy(name = trimmedName, colorHex = colorHex, icon = icon)
+        val finalIcon: String?
+        val finalColorHex: String?
+        if (!icon.isNullOrBlank()) {
+            finalIcon = icon
+            finalColorHex = null
+        } else if (!colorHex.isNullOrBlank()) {
+            finalIcon = null
+            finalColorHex = colorHex
+        } else {
+            finalIcon = null
+            finalColorHex = null
+        }
+
+        val updated = current.copy(name = trimmedName, colorHex = finalColorHex, icon = finalIcon)
         tagDao.updateTag(updated)
         Result.success(Unit)
+    }
+
+    /**
+     * 创建标签并立即与目标章节/试题关联
+     */
+    suspend fun createAndAttachTag(
+        name: String,
+        colorHex: String? = null,
+        icon: String? = null,
+        targetType: String,
+        targetId: String
+    ): Result<TagEntity> = withContext(Dispatchers.IO) {
+        val result = createTag(name, colorHex, icon)
+        result.onSuccess { newTag ->
+            tagDao.insertItemTag(ItemTagCrossRef(tagId = newTag.id, targetType = targetType, targetId = targetId))
+        }
+        result
     }
 
     /**
@@ -161,23 +201,32 @@ class TagRepository(private val tagDao: TagDao) {
 
     /**
      * 切换章节或试题对某一标签的关联状态（打标 / 去除打标）
+     * 规则：如果解绑后该标签所有关联的章节和试题都没了（计数为 0），则自动彻底删除该标签！
      */
     suspend fun toggleItemTag(tagId: String, targetType: String, targetId: String) = withContext(Dispatchers.IO) {
         val hasTag = tagDao.hasItemTag(tagId, targetType, targetId)
         if (hasTag) {
             tagDao.deleteItemTag(tagId, targetType, targetId)
+            val remainingCount = tagDao.countAllItemsForTag(tagId)
+            if (remainingCount == 0) {
+                tagDao.deleteTagEntity(tagId)
+            }
         } else {
             tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId))
         }
     }
 
     /**
+     * 清理所有无关联章节和试题的孤儿标签
+     */
+    suspend fun cleanupOrphanTags(): Int = withContext(Dispatchers.IO) {
+        tagDao.deleteOrphanTags()
+    }
+
+    /**
      * 批量为章节或试题设置标签
      */
     suspend fun setItemTags(targetType: String, targetId: String, tagIds: Set<String>) = withContext(Dispatchers.IO) {
-        // 先删除原有标签关联
-        val currentTags = tagDao.getAllItemTagsFlow()
-        // 简化：直接插入新关系并清理未选中的
         for (tagId in tagIds) {
             tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId))
         }

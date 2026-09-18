@@ -83,6 +83,7 @@ import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
 import com.ilunyu.lunyu.ui.tag.TagDeleteConfirmDialog
 import com.ilunyu.lunyu.ui.tag.TagEditDialog
+import com.ilunyu.lunyu.ui.tag.getTagImageVector
 import com.ilunyu.lunyu.ui.tag.parseTagColor
 
 // -------------------------------------------------------------
@@ -475,15 +476,27 @@ fun FavoritesScreen(
                                             .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(12.dp)
-                                                .background(tagColor, shape = CircleShape)
-                                        )
-                                        Spacer(modifier = Modifier.width(14.dp))
+                                        val iconVector = getTagImageVector(tag.icon)
+                                        if (iconVector != null) {
+                                            Icon(
+                                                imageVector = iconVector,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.primary,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(14.dp))
+                                        } else if (!tag.colorHex.isNullOrBlank()) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(12.dp)
+                                                    .background(tagColor, shape = CircleShape)
+                                            )
+                                            Spacer(modifier = Modifier.width(14.dp))
+                                        }
+
                                         Column(modifier = Modifier.weight(1f)) {
                                             Text(
-                                                text = "# ${tag.name}",
+                                                text = tag.name,
                                                 style = MaterialTheme.typography.titleMedium.copy(
                                                     fontWeight = FontWeight.SemiBold,
                                                     fontSize = 16.sp
@@ -547,7 +560,7 @@ fun FavoritesScreen(
     tagToEdit?.let { tag ->
         TagEditDialog(
             initialName = tag.name,
-            initialColorHex = tag.colorHex,
+            initialColorHex = tag.colorHex ?: TAG_PRESET_COLORS.first(),
             title = "编辑标签",
             onConfirm = { name, colorHex ->
                 onUpdateTag(tag.id, name, colorHex)

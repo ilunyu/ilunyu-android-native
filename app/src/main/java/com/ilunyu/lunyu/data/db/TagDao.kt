@@ -63,4 +63,10 @@ interface TagDao {
 
     @Query("SELECT COUNT(*) FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType")
     fun countItemsForTagFlow(tagId: String, targetType: String): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM item_tags WHERE tag_id = :tagId")
+    suspend fun countAllItemsForTag(tagId: String): Int
+
+    @Query("DELETE FROM tags WHERE id NOT IN (SELECT DISTINCT tag_id FROM item_tags)")
+    suspend fun deleteOrphanTags(): Int
 }

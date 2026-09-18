@@ -82,6 +82,7 @@ import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
 import com.ilunyu.lunyu.ui.tag.AddTagChip
 import com.ilunyu.lunyu.ui.tag.AddTagDialog
+import com.ilunyu.lunyu.ui.tag.TagActionDialog
 import com.ilunyu.lunyu.ui.tag.TagChip
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -111,6 +112,7 @@ fun ChapterScreen(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showAddTagDialog by remember { mutableStateOf(false) }
+    var selectedTagForAction by remember { mutableStateOf<TagEntity?>(null) }
     var isCopied by remember { mutableStateOf(false) }
     var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     val highlightProgress = remember(chapter.id) { Animatable(0f) }
@@ -302,8 +304,7 @@ fun ChapterScreen(
                                 name = tag.name,
                                 colorHex = tag.colorHex,
                                 icon = tag.icon,
-                                onClick = { onNavigateToTag(tag.id) },
-                                onDeleteClick = { onToggleTag(tag.id) }
+                                onClick = { selectedTagForAction = tag }
                             )
                         }
                         AddTagChip(
@@ -620,6 +621,23 @@ fun ChapterScreen(
                     onCreateTag(name, color, icon)
                 },
                 onDismissRequest = { showAddTagDialog = false }
+            )
+        }
+
+        selectedTagForAction?.let { tag ->
+            TagActionDialog(
+                tagName = tag.name,
+                colorHex = tag.colorHex,
+                icon = tag.icon,
+                onNavigateToTag = {
+                    selectedTagForAction = null
+                    onNavigateToTag(tag.id)
+                },
+                onRemoveFromItem = {
+                    selectedTagForAction = null
+                    onToggleTag(tag.id)
+                },
+                onDismiss = { selectedTagForAction = null }
             )
         }
     }

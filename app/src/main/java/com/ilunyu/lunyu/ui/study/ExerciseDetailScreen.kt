@@ -248,8 +248,9 @@ fun ExerciseDetailScreen(
                         ) {
                             attachedTags.forEach { tag ->
                                 TagChip(
-                                    name = "# ${tag.name}",
+                                    name = tag.name,
                                     colorHex = tag.colorHex,
+                                    icon = tag.icon,
                                     onClick = { showTagSheet = true }
                                 )
                             }

@@ -1,5 +1,6 @@
 package com.ilunyu.lunyu.ui.tag
 
+import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -186,14 +187,25 @@ fun TagDetailScreen(
                         modifier = Modifier.weight(1f),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .size(10.dp)
-                                .background(tagColor, shape = CircleShape)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
+                        val iconVector = getTagImageVector(tag.icon)
+                        if (iconVector != null) {
+                            Icon(
+                                imageVector = iconVector,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        } else if (!tag.colorHex.isNullOrBlank()) {
+                            Box(
+                                modifier = Modifier
+                                    .size(10.dp)
+                                    .background(tagColor, shape = CircleShape)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                        }
                         Text(
-                            text = "# ${tag.name}",
+                            text = tag.name,
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 18.sp
@@ -379,7 +391,7 @@ fun TagDetailScreen(
     if (showEditDialog) {
         TagEditDialog(
             initialName = tag.name,
-            initialColorHex = tag.colorHex,
+            initialColorHex = tag.colorHex ?: TAG_PRESET_COLORS.first(),
             onConfirm = { newName, newColorHex ->
                 viewModel.updateTag(tag.id, newName, newColorHex)
                 showEditDialog = false

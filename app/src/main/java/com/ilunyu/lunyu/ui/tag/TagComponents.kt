@@ -40,6 +40,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -71,7 +73,8 @@ import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
 /**
  * 辅助方法：解析 16 进制颜色字符串为 Compose Color
  */
-fun parseTagColor(hex: String, fallback: Color = Color(0xFF008080)): Color {
+fun parseTagColor(hex: String?, fallback: Color = Color(0xFF008080)): Color {
+    if (hex.isNullOrBlank()) return fallback
     return try {
         val cleanHex = hex.removePrefix("#")
         val colorInt = cleanHex.toLong(16)
@@ -99,84 +102,74 @@ fun getTagImageVector(icon: String?): ImageVector? {
 }
 
 /**
- * 雅致标签胶囊徽标 (TagChip)
- * 规范：颜色的展示方式不是设置 Chip 的背景色，而是在图标的位置放置一个对应颜色的实心圆（或由该颜色着色的图标）
+ * 标签徽标 (TagChip)
+ * 严格对齐题目列表同款 MD3 FilterChip 规范（尺寸、颜色、边框、间距一致）
+ * 规范：
+ * 1. 使用 Material Design 3 标准 FilterChip
+ * 2. 仅显示左侧可能存在的图标/颜色圆，以及标签名字（彻底去除 #，彻底去除 x）
+ * 3. 图标与色彩二选一；若用户均未设置，则不加颜色和图标，直接作为普通文本 label 展示
  */
 @Composable
 fun TagChip(
     name: String,
-    colorHex: String,
+    colorHex: String? = null,
     icon: String? = null,
     modifier: Modifier = Modifier,
-    onClick: (() -> Unit)? = null,
-    onDeleteClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null
 ) {
-    val tagColor = parseTagColor(colorHex)
-    val shape = RoundedCornerShape(8.dp)
     val cleanName = name.trim().removePrefix("#").trim()
+    val iconVector = getTagImageVector(icon)
+    val hasColor = !colorHex.isNullOrBlank()
 
-    Surface(
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-        modifier = modifier
-            .clip(shape)
-            .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-    ) {
-        Row(
-            modifier = Modifier.padding(
-                start = 10.dp,
-                end = if (onDeleteClick != null) 4.dp else 10.dp,
-                top = 5.dp,
-                bottom = 5.dp
-            ),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val iconVector = getTagImageVector(icon)
-            if (iconVector != null) {
-                Icon(
-                    imageVector = iconVector,
-                    contentDescription = null,
-                    tint = tagColor,
-                    modifier = Modifier.size(15.dp)
-                )
-            } else {
-                Box(
-                    modifier = Modifier
-                        .size(8.dp)
-                        .background(color = tagColor, shape = CircleShape)
-                )
-            }
-            Spacer(modifier = Modifier.width(6.dp))
+    FilterChip(
+        selected = false,
+        onClick = { onClick?.invoke() },
+        label = {
             Text(
-                text = "# $cleanName",
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.onSurface
+                text = cleanName,
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 ),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                maxLines = 1
             )
-            if (onDeleteClick != null) {
-                Spacer(modifier = Modifier.width(4.dp))
-                IconButton(
-                    onClick = onDeleteClick,
-                    modifier = Modifier.size(18.dp)
-                ) {
+        },
+        leadingIcon = if (iconVector != null || hasColor) {
+            {
+                if (iconVector != null) {
                     Icon(
-                        imageVector = Icons.Default.Close,
-                        contentDescription = "移除标签",
-                        modifier = Modifier.size(13.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        imageVector = iconVector,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else if (hasColor) {
+                    val tagColor = parseTagColor(colorHex)
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(color = tagColor, shape = CircleShape)
                     )
                 }
             }
-        }
-    }
+        } else null,
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = false,
+            borderColor = MaterialTheme.colorScheme.outlineVariant
+        ),
+        modifier = modifier
+    )
 }
 
 /**
  * 添加标签的引导 Chip（呈现 Material Symbol New 的 New Label 图标）
+ * 严格对齐题目列表同款 MD3 FilterChip 规范（尺寸、颜色、边框完全一致）
  */
 @Composable
 fun AddTagChip(
@@ -184,35 +177,154 @@ fun AddTagChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape = RoundedCornerShape(8.dp)
-    Surface(
+    FilterChip(
+        selected = false,
         onClick = onClick,
-        shape = shape,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)),
-        modifier = modifier
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.NewLabel,
-                contentDescription = label,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(16.dp)
-            )
-            Spacer(modifier = Modifier.width(6.dp))
+        label = {
             Text(
                 text = label,
-                style = MaterialTheme.typography.labelMedium.copy(
-                    fontWeight = FontWeight.Medium,
-                    color = MaterialTheme.colorScheme.primary
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
                 ),
                 maxLines = 1
             )
+        },
+        leadingIcon = {
+            Icon(
+                imageVector = Icons.Outlined.NewLabel,
+                contentDescription = label,
+                modifier = Modifier.size(16.dp)
+            )
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+            iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = false,
+            borderColor = MaterialTheme.colorScheme.outlineVariant
+        ),
+        modifier = modifier
+    )
+}
+
+/**
+ * 点击已有标签 Chip 弹出的操作选项对话框：
+ * 允许用户直接查看该标签关联内容，或从当前章节中解除关联
+ */
+@Composable
+fun TagActionDialog(
+    tagName: String,
+    colorHex: String? = null,
+    icon: String? = null,
+    onNavigateToTag: () -> Unit,
+    onRemoveFromItem: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val cleanName = tagName.trim().removePrefix("#").trim()
+    val iconVector = getTagImageVector(icon)
+    val hasColor = !colorHex.isNullOrBlank()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(16.dp),
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                if (iconVector != null) {
+                    Icon(
+                        imageVector = iconVector,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                } else if (hasColor) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .background(color = parseTagColor(colorHex), shape = CircleShape)
+                    )
+                }
+                Text(
+                    text = cleanName,
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        onNavigateToTag()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.QuestionAnswer,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "查看该标签下的所有内容",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        )
+                    }
+                }
+                TextButton(
+                    onClick = {
+                        onDismiss()
+                        onRemoveFromItem()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = ButtonDefaults.TextButtonContentPadding
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Text(
+                            text = "从本章移除此标签",
+                            style = MaterialTheme.typography.bodyLarge.copy(
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("取消")
+            }
         }
-    }
+    )
 }
 
 /**
@@ -730,7 +842,12 @@ fun AddTagDialog(
                             val isSelected = selectedIcon == id
                             Surface(
                                 onClick = {
-                                    selectedIcon = if (isSelected) null else id
+                                    if (isSelected) {
+                                        selectedIcon = null
+                                    } else {
+                                        selectedIcon = id
+                                        selectedColor = null
+                                    }
                                 },
                                 shape = CircleShape,
                                 color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
@@ -762,7 +879,12 @@ fun AddTagDialog(
                             val isSelected = selectedColor == hex
                             Surface(
                                 onClick = {
-                                    selectedColor = if (isSelected) null else hex
+                                    if (isSelected) {
+                                        selectedColor = null
+                                    } else {
+                                        selectedColor = hex
+                                        selectedIcon = null
+                                    }
                                 },
                                 shape = CircleShape,
                                 color = color,
