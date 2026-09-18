@@ -1,8 +1,10 @@
 package com.ilunyu.lunyu
 
 import android.app.Application
+import com.ilunyu.lunyu.data.db.AppDatabase
 import com.ilunyu.lunyu.data.repository.AnalectsRepository
 import com.ilunyu.lunyu.data.repository.ExerciseRepository
+import com.ilunyu.lunyu.data.repository.TagRepository
 import com.ilunyu.lunyu.data.repository.UserPreferencesRepository
 
 class LunyuApplication : Application() {
@@ -12,9 +14,15 @@ class LunyuApplication : Application() {
         private set
     lateinit var userPreferencesRepository: UserPreferencesRepository
         private set
+    lateinit var database: AppDatabase
+        private set
+    lateinit var tagRepository: TagRepository
+        private set
 
     override fun onCreate() {
         super.onCreate()
+        database = AppDatabase.getInstance(this)
+        tagRepository = TagRepository(database.tagDao())
         analectsRepository = AnalectsRepository(this)
         exerciseRepository = ExerciseRepository(this)
         userPreferencesRepository = UserPreferencesRepository(this)

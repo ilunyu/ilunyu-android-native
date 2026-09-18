@@ -72,13 +72,21 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.automirrored.filled.Label
+import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.ui.unit.sp
+import com.ilunyu.lunyu.data.db.TagEntity
+import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
+import com.ilunyu.lunyu.ui.tag.TagChip
+import com.ilunyu.lunyu.ui.tag.TagSelectionBottomSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChapterScreen(
     pian: Pian,
@@ -86,6 +94,10 @@ fun ChapterScreen(
     prevChapter: Pair<Pian, Chapter>?,
     nextChapter: Pair<Pian, Chapter>?,
     isFavorite: Boolean,
+    attachedTags: List<TagEntity> = emptyList(),
+    allTags: List<TagWithCounts> = emptyList(),
+    onToggleTag: (String) -> Unit = {},
+    onCreateTag: (String, String?) -> Unit = { _, _ -> },
     scrollIndex: Int = 0,
     scrollOffset: Int = 0,
     onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
@@ -97,6 +109,7 @@ fun ChapterScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    var showTagSheet by remember { mutableStateOf(false) }
     var isCopied by remember { mutableStateOf(false) }
     var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     val highlightProgress = remember(chapter.id) { Animatable(0f) }
@@ -181,6 +194,15 @@ fun ChapterScreen(
                             contentDescription = "复制原文"
                         )
                     }
+                    // 标签按钮
+                    IconButton(onClick = { showTagSheet = true }) {
+                        val hasTags = attachedTags.isNotEmpty()
+                        Icon(
+                            imageVector = if (hasTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Outlined.Label,
+                            contentDescription = "标签",
+                            tint = if (hasTags) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                     // 收藏按钮
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
@@ -252,6 +274,23 @@ fun ChapterScreen(
                             annotationCharOffsets[noteNum] = charOffset
                         }
                     )
+                    if (attachedTags.isNotEmpty()) {
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp)
+                        ) {
+                            attachedTags.forEach { tag ->
+                                TagChip(
+                                    name = "# ${tag.name}",
+                                    colorHex = tag.colorHex,
+                                    onClick = { showTagSheet = true }
+                                )
+                            }
+                        }
+                    }
                     Text(
                         text = originalAnnotated,
                         onTextLayout = { textLayoutResult = it },
@@ -557,6 +596,17 @@ fun ChapterScreen(
                     }
                 }
             }
+        }
+
+        if (showTagSheet) {
+            TagSelectionBottomSheet(
+                targetTitle = "${pian.shortTitle} · 第 ${chapter.number} 章",
+                allTags = allTags,
+                attachedTagIds = attachedTags.map { it.id }.toSet(),
+                onToggleTag = onToggleTag,
+                onCreateTag = onCreateTag,
+                onDismissRequest = { showTagSheet = false }
+            )
         }
     }
 }

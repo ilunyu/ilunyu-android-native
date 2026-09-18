@@ -54,12 +54,14 @@ import com.ilunyu.lunyu.ui.search.SearchScreen
 import com.ilunyu.lunyu.ui.settings.SettingsScreen
 import com.ilunyu.lunyu.ui.study.ExerciseDetailScreen
 import com.ilunyu.lunyu.ui.study.StudyScreen
+import com.ilunyu.lunyu.ui.tag.TagDetailScreen
 import kotlinx.coroutines.launch
 
 sealed interface ScreenDestination {
     data class Tab(val index: Int) : ScreenDestination
     data class ChapterDetail(val pianSlug: String, val chapterNumber: Int) : ScreenDestination
     data class ExerciseDetail(val exerciseId: String) : ScreenDestination
+    data class TagDetail(val tagId: String) : ScreenDestination
     data class Search(val initialTab: Int = 0) : ScreenDestination
 }
 
@@ -101,6 +103,7 @@ fun MainScreen(
 
     val chapterDetailScrollMap by viewModel.chapterDetailScrollMap.collectAsState()
     val exerciseDetailScrollMap by viewModel.exerciseDetailScrollMap.collectAsState()
+    val tagsWithCounts by viewModel.tagsWithCounts.collectAsState()
 
     var destinationStack by remember { mutableStateOf(listOf<ScreenDestination>(ScreenDestination.Tab(0))) }
     var isNavigatingBack by remember { mutableStateOf(false) }
@@ -109,6 +112,7 @@ fun MainScreen(
         is ScreenDestination.Tab -> currentDestination.index
         is ScreenDestination.ChapterDetail -> 0
         is ScreenDestination.ExerciseDetail -> 1
+        is ScreenDestination.TagDetail -> 2
         is ScreenDestination.Search -> -1
     }
 
@@ -391,6 +395,11 @@ fun MainScreen(
                                 favoriteExerciseIds = favoriteExercises,
                                 allPians = library?.pians ?: emptyList(),
                                 allExercises = exercises,
+                                allTags = tagsWithCounts,
+                                onCreateTag = { name, color -> viewModel.createTag(name, color) },
+                                onUpdateTag = { tagId, name, color -> viewModel.updateTag(tagId, name, color) },
+                                onDeleteTag = { tagId -> viewModel.deleteTag(tagId) },
+                                onNavigateToTag = { tagId -> navigateTo(ScreenDestination.TagDetail(tagId)) },
                                 selectedTab = favoritesTab,
                                 onTabChange = { viewModel.setFavoritesTab(it) },
                                 sortMode = favoritesSortMode,
@@ -446,12 +455,20 @@ fun MainScreen(
                         if (data != null) {
                             val (pian, chapter) = data
                             val scrollPair = chapterDetailScrollMap[chapter.id]
+                            val attachedTags by remember(chapter.id) {
+                                viewModel.getTagsForItem("CHAPTER", chapter.id)
+                            }.collectAsState(initial = emptyList())
+
                             ChapterScreen(
                                 pian = pian,
                                 chapter = chapter,
                                 prevChapter = adjacentChapters.first,
                                 nextChapter = adjacentChapters.second,
                                 isFavorite = favoriteChapters.contains(chapter.id),
+                                attachedTags = attachedTags,
+                                allTags = tagsWithCounts,
+                                onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "CHAPTER", chapter.id) },
+                                onCreateTag = { name, color -> viewModel.createTag(name, color) },
                                 scrollIndex = scrollPair?.first ?: 0,
                                 scrollOffset = scrollPair?.second ?: 0,
                                 onSaveScroll = { idx, off ->
@@ -482,9 +499,17 @@ fun MainScreen(
                         val exercise = exerciseData
                         if (exercise != null) {
                             val scrollPair = exerciseDetailScrollMap[exercise.id]
+                            val attachedTags by remember(exercise.id) {
+                                viewModel.getTagsForItem("EXERCISE", exercise.id)
+                            }.collectAsState(initial = emptyList())
+
                             ExerciseDetailScreen(
                                 exercise = exercise,
                                 isFavorite = favoriteExercises.contains(exercise.id),
+                                attachedTags = attachedTags,
+                                allTags = tagsWithCounts,
+                                onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "EXERCISE", exercise.id) },
+                                onCreateTag = { name, color -> viewModel.createTag(name, color) },
                                 scrollIndex = scrollPair?.first ?: 0,
                                 scrollOffset = scrollPair?.second ?: 0,
                                 onSaveScroll = { idx, off ->
@@ -510,6 +535,22 @@ fun MainScreen(
                                 CircularProgressIndicator()
                             }
                         }
+                    }
+                    is ScreenDestination.TagDetail -> {
+                        TagDetailScreen(
+                            tagId = dest.tagId,
+                            viewModel = viewModel,
+                            onBackClick = {
+                                navigateBack()
+                            },
+                            onNavigateToChapter = { slug, number ->
+                                viewModel.setActivePianSlug(slug)
+                                navigateTo(ScreenDestination.ChapterDetail(slug, number))
+                            },
+                            onNavigateToExercise = { exerciseId ->
+                                navigateTo(ScreenDestination.ExerciseDetail(exerciseId))
+                            }
+                        )
                     }
                     is ScreenDestination.Search -> {
                         val searchExercises by viewModel.searchExercises.collectAsState()

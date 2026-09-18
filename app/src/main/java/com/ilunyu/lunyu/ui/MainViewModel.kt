@@ -10,7 +10,11 @@ import com.ilunyu.lunyu.data.model.AppThemeMode
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.Pian
+import com.ilunyu.lunyu.data.db.TagEntity
+import com.ilunyu.lunyu.data.db.TagWithCounts
+import com.ilunyu.lunyu.data.db.TargetType
 import com.ilunyu.lunyu.ui.favorites.FavoritesSortMode
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +28,52 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val userPrefs = app.userPreferencesRepository
     private val analectsRepo = app.analectsRepository
     private val exerciseRepo = app.exerciseRepository
+    private val tagRepo = app.tagRepository
+
+    val tagsWithCounts: StateFlow<List<TagWithCounts>> = tagRepo.allTagsWithCountsFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun getTagsForItem(targetType: String, targetId: String): Flow<List<TagEntity>> {
+        return tagRepo.getTagsForItemFlow(targetType, targetId)
+    }
+
+    fun getChapterIdsForTag(tagId: String): Flow<List<String>> {
+        return tagRepo.getChapterIdsForTagFlow(tagId)
+    }
+
+    fun getExerciseIdsForTag(tagId: String): Flow<List<String>> {
+        return tagRepo.getExerciseIdsForTagFlow(tagId)
+    }
+
+    suspend fun getTagById(tagId: String): TagEntity? {
+        return tagRepo.getTagById(tagId)
+    }
+
+    fun createTag(name: String, colorHex: String? = null, onResult: (Result<TagEntity>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = tagRepo.createTag(name, colorHex)
+            onResult(result)
+        }
+    }
+
+    fun updateTag(tagId: String, name: String, colorHex: String, onResult: (Result<Unit>) -> Unit = {}) {
+        viewModelScope.launch {
+            val result = tagRepo.updateTag(tagId, name, colorHex)
+            onResult(result)
+        }
+    }
+
+    fun deleteTag(tagId: String) {
+        viewModelScope.launch {
+            tagRepo.deleteTag(tagId)
+        }
+    }
+
+    fun toggleItemTag(tagId: String, targetType: String, targetId: String) {
+        viewModelScope.launch {
+            tagRepo.toggleItemTag(tagId, targetType, targetId)
+        }
+    }
 
     val themeMode: StateFlow<AppThemeMode> = userPrefs.themeModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppThemeMode.SYSTEM)

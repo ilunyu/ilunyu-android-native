@@ -61,6 +61,30 @@ import com.ilunyu.lunyu.ui.study.sortTypes
 import com.ilunyu.lunyu.ui.study.ExerciseListRow
 import kotlinx.coroutines.launch
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.outlined.Label
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.Button
+import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
+import com.ilunyu.lunyu.data.db.TagEntity
+import com.ilunyu.lunyu.data.db.TagWithCounts
+import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
+import com.ilunyu.lunyu.ui.tag.TagDeleteConfirmDialog
+import com.ilunyu.lunyu.ui.tag.TagEditDialog
+import com.ilunyu.lunyu.ui.tag.parseTagColor
+
 // -------------------------------------------------------------
 // ...
 // -------------------------------------------------------------
@@ -78,6 +102,11 @@ fun FavoritesScreen(
     favoriteExerciseIds: Set<String>,
     allPians: List<Pian>,
     allExercises: List<Exercise>,
+    allTags: List<TagWithCounts> = emptyList(),
+    onCreateTag: (String, String?) -> Unit = { _, _ -> },
+    onUpdateTag: (String, String, String) -> Unit = { _, _, _ -> },
+    onDeleteTag: (String) -> Unit = {},
+    onNavigateToTag: (String) -> Unit = {},
     selectedTab: Int = 0,
     onTabChange: (Int) -> Unit = {},
     sortMode: FavoritesSortMode = FavoritesSortMode.DEFAULT,
@@ -100,10 +129,14 @@ fun FavoritesScreen(
     modifier: Modifier = Modifier
 ) {
     val pagerState = rememberPagerState(
-        initialPage = selectedTab,
-        pageCount = { 2 }
+        initialPage = selectedTab.coerceIn(0, 2),
+        pageCount = { 3 }
     )
     val coroutineScope = rememberCoroutineScope()
+
+    var showCreateTagDialog by remember { mutableStateOf(false) }
+    var tagToEdit by remember { mutableStateOf<TagEntity?>(null) }
+    var tagToDelete by remember { mutableStateOf<TagEntity?>(null) }
 
     LaunchedEffect(pagerState.currentPage) {
         onTabChange(pagerState.currentPage)
@@ -235,7 +268,7 @@ fun FavoritesScreen(
             com.ilunyu.lunyu.ui.common.LunyuFixedTabRow(
                 selectedTabIndex = pagerState.currentPage,
                 pagerState = pagerState,
-                tabs = listOf("章节", "试题"),
+                tabs = listOf("章节", "试题", "标签"),
                 onTabSelected = { index ->
                     coroutineScope.launch { pagerState.animateScrollToPage(index) }
                 }
@@ -354,8 +387,185 @@ fun FavoritesScreen(
                         }
                     }
                 }
+                2 -> {
+                    // 标签聚合视图
+                    if (allTags.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(horizontal = 32.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Outlined.Label,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(56.dp),
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = "暂无自定义标签",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "在章阅读或试题详情页点击标签图标，即可创建标签并归纳内容",
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center
+                                    )
+                                )
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Button(
+                                    onClick = { showCreateTagDialog = true },
+                                    shape = RoundedCornerShape(12.dp)
+                                ) {
+                                    Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text("新建第一个标签", fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
+                    } else {
+                        LazyColumn(modifier = Modifier.fillMaxSize()) {
+                            item(key = "tag_header") {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 24.dp, end = 16.dp, top = 20.dp, bottom = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(
+                                        text = "共 ${allTags.size} 个标签",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                    TextButton(onClick = { showCreateTagDialog = true }) {
+                                        Icon(imageVector = Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
+                                        Spacer(modifier = Modifier.width(4.dp))
+                                        Text("新建标签", fontWeight = FontWeight.SemiBold)
+                                    }
+                                }
+                            }
+
+                            itemsIndexed(
+                                items = allTags,
+                                key = { _, tagWithCount -> tagWithCount.tag.id }
+                            ) { _, tagWithCount ->
+                                val tag = tagWithCount.tag
+                                val tagColor = parseTagColor(tag.colorHex)
+
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 24.dp, vertical = 6.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable { onNavigateToTag(tag.id) }
+                                ) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 16.dp, end = 8.dp, top = 14.dp, bottom = 14.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(12.dp)
+                                                .background(tagColor, shape = CircleShape)
+                                        )
+                                        Spacer(modifier = Modifier.width(14.dp))
+                                        Column(modifier = Modifier.weight(1f)) {
+                                            Text(
+                                                text = "# ${tag.name}",
+                                                style = MaterialTheme.typography.titleMedium.copy(
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    fontSize = 16.sp
+                                                ),
+                                                maxLines = 1,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Text(
+                                                text = "${tagWithCount.chapterCount} 章 · ${tagWithCount.exerciseCount} 题",
+                                                style = MaterialTheme.typography.bodySmall.copy(
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            )
+                                        }
+
+                                        IconButton(onClick = { tagToEdit = tag }) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Edit,
+                                                contentDescription = "编辑标签",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        IconButton(onClick = { tagToDelete = tag }) {
+                                            Icon(
+                                                imageVector = Icons.Outlined.Delete,
+                                                contentDescription = "删除标签",
+                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            item(key = "bottom_spacer") {
+                                Spacer(modifier = Modifier.height(48.dp))
+                            }
+                        }
+                    }
+                }
             }
         }
+    }
+
+    if (showCreateTagDialog) {
+        TagEditDialog(
+            initialName = "",
+            initialColorHex = TAG_PRESET_COLORS.first(),
+            title = "新建标签",
+            onConfirm = { name, colorHex ->
+                onCreateTag(name, colorHex)
+                showCreateTagDialog = false
+            },
+            onDismiss = { showCreateTagDialog = false }
+        )
+    }
+
+    tagToEdit?.let { tag ->
+        TagEditDialog(
+            initialName = tag.name,
+            initialColorHex = tag.colorHex,
+            title = "编辑标签",
+            onConfirm = { name, colorHex ->
+                onUpdateTag(tag.id, name, colorHex)
+                tagToEdit = null
+            },
+            onDismiss = { tagToEdit = null }
+        )
+    }
+
+    tagToDelete?.let { tag ->
+        TagDeleteConfirmDialog(
+            tagName = tag.name,
+            onConfirm = {
+                onDeleteTag(tag.id)
+                tagToDelete = null
+            },
+            onDismiss = { tagToDelete = null }
+        )
     }
 
     if (activeFilterDimension != null) {

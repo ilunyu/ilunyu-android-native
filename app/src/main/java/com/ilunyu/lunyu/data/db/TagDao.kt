@@ -1,0 +1,66 @@
+package com.ilunyu.lunyu.data.db
+
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
+import kotlinx.coroutines.flow.Flow
+
+@Dao
+interface TagDao {
+
+    @Query("SELECT * FROM tags ORDER BY sort_order ASC, created_at DESC")
+    fun getAllTagsFlow(): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM tags WHERE id = :id LIMIT 1")
+    suspend fun getTagById(id: String): TagEntity?
+
+    @Query("SELECT * FROM tags WHERE name = :name LIMIT 1")
+    suspend fun getTagByName(name: String): TagEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertTag(tag: TagEntity): Long
+
+    @Update
+    suspend fun updateTag(tag: TagEntity)
+
+    @Query("DELETE FROM tags WHERE id = :tagId")
+    suspend fun deleteTagEntity(tagId: String): Int
+
+    @Query("DELETE FROM item_tags WHERE tag_id = :tagId")
+    suspend fun deleteItemTagsByTagId(tagId: String): Int
+
+    @Transaction
+    suspend fun deleteTag(tagId: String) {
+        deleteItemTagsByTagId(tagId)
+        deleteTagEntity(tagId)
+    }
+
+    @Query("""
+        SELECT t.* FROM tags t
+        INNER JOIN item_tags it ON t.id = it.tag_id
+        WHERE it.target_type = :targetType AND it.target_id = :targetId
+        ORDER BY t.sort_order ASC, t.created_at DESC
+    """)
+    fun getTagsForItemFlow(targetType: String, targetId: String): Flow<List<TagEntity>>
+
+    @Query("SELECT * FROM item_tags")
+    fun getAllItemTagsFlow(): Flow<List<ItemTagCrossRef>>
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertItemTag(crossRef: ItemTagCrossRef)
+
+    @Query("DELETE FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType AND target_id = :targetId")
+    suspend fun deleteItemTag(tagId: String, targetType: String, targetId: String): Int
+
+    @Query("SELECT target_id FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType ORDER BY created_at DESC")
+    fun getTargetIdsForTagFlow(tagId: String, targetType: String): Flow<List<String>>
+
+    @Query("SELECT COUNT(*) > 0 FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType AND target_id = :targetId")
+    suspend fun hasItemTag(tagId: String, targetType: String, targetId: String): Boolean
+
+    @Query("SELECT COUNT(*) FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType")
+    fun countItemsForTagFlow(tagId: String, targetType: String): Flow<Int>
+}
