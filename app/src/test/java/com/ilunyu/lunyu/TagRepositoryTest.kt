@@ -129,6 +129,16 @@ class TagRepositoryTest {
         // Blank check
         val blankResult = repository.createTag("   ")
         assertTrue(blankResult.isFailure)
+
+        // Length > 10 check
+        val longResult = repository.createTag("这是一段超过十个字符的标签名称")
+        assertTrue(longResult.isFailure)
+
+        // Create with icon
+        val iconResult = repository.createTag("仁者爱人", "#C04851", "star")
+        assertTrue(iconResult.isSuccess)
+        val iconTag = iconResult.getOrThrow()
+        assertEquals("star", iconTag.icon)
     }
 
     @Test

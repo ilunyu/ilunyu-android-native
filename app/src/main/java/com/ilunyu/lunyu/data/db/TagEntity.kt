@@ -19,6 +19,8 @@ data class TagEntity(
     val name: String,
     @ColumnInfo(name = "color_hex")
     val colorHex: String = "#008080", // 默认黛绿 (Teal)
+    @ColumnInfo(name = "icon")
+    val icon: String? = null, // 代表图标：star, person, lightbulb, question_answer
     @ColumnInfo(name = "sort_order")
     val sortOrder: Int = 0,
     @ColumnInfo(name = "created_at")

@@ -72,8 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.material.icons.automirrored.filled.Label
 import androidx.compose.material.icons.automirrored.outlined.Label
 import androidx.compose.ui.unit.sp
@@ -81,12 +80,13 @@ import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
+import com.ilunyu.lunyu.ui.tag.AddTagChip
+import com.ilunyu.lunyu.ui.tag.AddTagDialog
 import com.ilunyu.lunyu.ui.tag.TagChip
-import com.ilunyu.lunyu.ui.tag.TagSelectionBottomSheet
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ChapterScreen(
     pian: Pian,
@@ -97,7 +97,8 @@ fun ChapterScreen(
     attachedTags: List<TagEntity> = emptyList(),
     allTags: List<TagWithCounts> = emptyList(),
     onToggleTag: (String) -> Unit = {},
-    onCreateTag: (String, String?) -> Unit = { _, _ -> },
+    onCreateTag: (String, String?, String?) -> Unit = { _, _, _ -> },
+    onNavigateToTag: (String) -> Unit = {},
     scrollIndex: Int = 0,
     scrollOffset: Int = 0,
     onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
@@ -109,7 +110,7 @@ fun ChapterScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    var showTagSheet by remember { mutableStateOf(false) }
+    var showAddTagDialog by remember { mutableStateOf(false) }
     var isCopied by remember { mutableStateOf(false) }
     var highlightedAnnotationIndex by remember(chapter.id) { mutableStateOf<Int?>(null) }
     val highlightProgress = remember(chapter.id) { Animatable(0f) }
@@ -194,15 +195,6 @@ fun ChapterScreen(
                             contentDescription = "复制原文"
                         )
                     }
-                    // 标签按钮
-                    IconButton(onClick = { showTagSheet = true }) {
-                        val hasTags = attachedTags.isNotEmpty()
-                        Icon(
-                            imageVector = if (hasTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Outlined.Label,
-                            contentDescription = "标签",
-                            tint = if (hasTags) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     // 收藏按钮
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
@@ -231,7 +223,7 @@ fun ChapterScreen(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, top = 24.dp, end = 24.dp, bottom = 48.dp)
+                        .padding(start = 24.dp, top = 24.dp, end = 24.dp)
                 ) {
                     val rawOrPlain = if (chapter.text.isNotBlank()) chapter.text else chapter.plainText
                     val originalAnnotated = formatChapterOriginalText(
@@ -274,23 +266,6 @@ fun ChapterScreen(
                             annotationCharOffsets[noteNum] = charOffset
                         }
                     )
-                    if (attachedTags.isNotEmpty()) {
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 12.dp)
-                        ) {
-                            attachedTags.forEach { tag ->
-                                TagChip(
-                                    name = "# ${tag.name}",
-                                    colorHex = tag.colorHex,
-                                    onClick = { showTagSheet = true }
-                                )
-                            }
-                        }
-                    }
                     Text(
                         text = originalAnnotated,
                         onTextLayout = { textLayoutResult = it },
@@ -303,6 +278,42 @@ fun ChapterScreen(
                         )
                     )
                 }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // 标签 Chips 行（水平滑动，超出右边滑入，逻辑与题目页面的筛选器 Chips 行相同）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (attachedTags.isEmpty()) {
+                        // 没有任何标签的情况下，只呈现一个 Chip，左侧 Icon 是 Material Symbol New 的 New Label icon
+                        AddTagChip(
+                            label = "添加一个标签",
+                            onClick = { showAddTagDialog = true }
+                        )
+                    } else {
+                        attachedTags.forEach { tag ->
+                            TagChip(
+                                name = tag.name,
+                                colorHex = tag.colorHex,
+                                icon = tag.icon,
+                                onClick = { onNavigateToTag(tag.id) },
+                                onDeleteClick = { onToggleTag(tag.id) }
+                            )
+                        }
+                        AddTagChip(
+                            label = "添加",
+                            onClick = { showAddTagDialog = true }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(48.dp))
 
                 // 2. 翻译板块
                 Column(
@@ -598,14 +609,17 @@ fun ChapterScreen(
             }
         }
 
-        if (showTagSheet) {
-            TagSelectionBottomSheet(
-                targetTitle = "${pian.shortTitle} · 第 ${chapter.number} 章",
-                allTags = allTags,
+        if (showAddTagDialog) {
+            AddTagDialog(
+                allExistingTags = allTags.map { it.tag },
                 attachedTagIds = attachedTags.map { it.id }.toSet(),
-                onToggleTag = onToggleTag,
-                onCreateTag = onCreateTag,
-                onDismissRequest = { showTagSheet = false }
+                onSelectExistingTag = { existingTag ->
+                    onToggleTag(existingTag.id)
+                },
+                onCreateNewTag = { name, color, icon ->
+                    onCreateTag(name, color, icon)
+                },
+                onDismissRequest = { showAddTagDialog = false }
             )
         }
     }

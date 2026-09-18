@@ -89,10 +89,17 @@ class TagRepository(private val tagDao: TagDao) {
     /**
      * 创建新标签（支持防重名校验与颜色自动轮转分配）
      */
-    suspend fun createTag(name: String, colorHex: String? = null): Result<TagEntity> = withContext(Dispatchers.IO) {
+    suspend fun createTag(
+        name: String,
+        colorHex: String? = null,
+        icon: String? = null
+    ): Result<TagEntity> = withContext(Dispatchers.IO) {
         val trimmedName = name.trim().removePrefix("#").trim()
         if (trimmedName.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能为空"))
+        }
+        if (trimmedName.length > 10) {
+            return@withContext Result.failure(IllegalArgumentException("标签名称不能超过10个字符"))
         }
 
         val existing = tagDao.getTagByName(trimmedName)
@@ -108,19 +115,28 @@ class TagRepository(private val tagDao: TagDao) {
 
         val newTag = TagEntity(
             name = trimmedName,
-            colorHex = color
+            colorHex = color,
+            icon = icon
         )
         tagDao.insertTag(newTag)
         Result.success(newTag)
     }
 
     /**
-     * 重命名标签或修改标签主题色
+     * 重命名标签或修改标签主题色与图标
      */
-    suspend fun updateTag(tagId: String, name: String, colorHex: String): Result<Unit> = withContext(Dispatchers.IO) {
+    suspend fun updateTag(
+        tagId: String,
+        name: String,
+        colorHex: String,
+        icon: String? = null
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         val trimmedName = name.trim().removePrefix("#").trim()
         if (trimmedName.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能为空"))
+        }
+        if (trimmedName.length > 10) {
+            return@withContext Result.failure(IllegalArgumentException("标签名称不能超过10个字符"))
         }
 
         val current = tagDao.getTagById(tagId)
@@ -131,7 +147,7 @@ class TagRepository(private val tagDao: TagDao) {
             return@withContext Result.failure(IllegalStateException("已存在同名标签：$trimmedName"))
         }
 
-        val updated = current.copy(name = trimmedName, colorHex = colorHex)
+        val updated = current.copy(name = trimmedName, colorHex = colorHex, icon = icon)
         tagDao.updateTag(updated)
         Result.success(Unit)
     }
