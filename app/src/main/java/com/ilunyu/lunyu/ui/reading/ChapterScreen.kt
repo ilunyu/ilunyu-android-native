@@ -74,29 +74,27 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.boundsInRoot
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.db.TagEntity
@@ -110,64 +108,68 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * 拖动标签时从屏幕顶部滑下的红色垃圾桶区域
+ * 拖拽排序标签时，末尾展示的红色垃圾桶移除插槽
  */
 @Composable
-private fun TopDeleteDropZone(
+private fun DeleteDropTagChip(
     isHovering: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val backgroundColor by animateColorAsState(
+    val scale by animateFloatAsState(
+        targetValue = if (isHovering) 1.08f else 1.0f,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "delete_chip_scale"
+    )
+    val containerColor by animateColorAsState(
         targetValue = if (isHovering) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "delete_zone_bg"
+        label = "delete_chip_bg"
     )
     val contentColor by animateColorAsState(
         targetValue = if (isHovering) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
-        label = "delete_zone_content"
-    )
-    val iconScale by animateFloatAsState(
-        targetValue = if (isHovering) 1.25f else 1.0f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy),
-        label = "delete_icon_scale"
+        label = "delete_chip_content"
     )
 
-    Surface(
-        color = backgroundColor,
-        modifier = modifier.fillMaxWidth(),
-        shadowElevation = 8.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(vertical = 12.dp, horizontal = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
+    FilterChip(
+        selected = false,
+        onClick = {},
+        label = {
+            Text(
+                text = if (isHovering) "松手移除" else "移除",
+                style = MaterialTheme.typography.labelLarge.copy(
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium
+                ),
+                maxLines = 1
+            )
+        },
+        leadingIcon = {
             Icon(
                 imageVector = if (isHovering) Icons.Filled.Delete else Icons.Outlined.Delete,
-                contentDescription = "从本章移除标签",
-                tint = contentColor,
-                modifier = Modifier
-                    .size(28.dp)
-                    .graphicsLayer {
-                        scaleX = iconScale
-                        scaleY = iconScale
-                    }
+                contentDescription = "移除标签",
+                modifier = Modifier.size(16.dp)
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = if (isHovering) "松手立即从本章移除" else "拖动至此处从本章移除",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = if (isHovering) FontWeight.Bold else FontWeight.Medium,
-                    fontSize = 14.sp
-                ),
-                color = contentColor
-            )
+        },
+        shape = RoundedCornerShape(8.dp),
+        colors = FilterChipDefaults.filterChipColors(
+            containerColor = containerColor,
+            labelColor = contentColor,
+            iconColor = contentColor
+        ),
+        border = FilterChipDefaults.filterChipBorder(
+            enabled = true,
+            selected = false,
+            borderColor = if (isHovering) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
+        ),
+        modifier = modifier.graphicsLayer {
+            scaleX = scale
+            scaleY = scale
         }
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -205,18 +207,28 @@ fun ChapterScreen(
     var highlightJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
     var scrollJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
 
-    // 标签拖拽排序与删除状态
-    var draggingTag by remember { mutableStateOf<TagEntity?>(null) }
-    var dragOffsetInRoot by remember { mutableStateOf(Offset.Zero) }
+    // 标签行内拖拽排序与删除状态
+    var draggingTagId by remember { mutableStateOf<String?>(null) }
+    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var targetSlotIndex by remember { mutableIntStateOf(-1) }
     var isHoveringDeleteZone by remember { mutableStateOf(false) }
-    var deleteZoneHeightPx by remember { mutableFloatStateOf(with(density) { 100.dp.toPx() }) }
 
     // 本章节标签在内存中的实时可重排列表
     val currentTags = remember(attachedTags) {
         mutableStateListOf<TagEntity>().apply { addAll(attachedTags) }
     }
-    // 缓存各 Chip 在根坐标系下的外接矩形 Bounds
-    val chipBoundsMap = remember { mutableMapOf<String, Rect>() }
+    LaunchedEffect(attachedTags) {
+        if (draggingTagId == null) {
+            currentTags.clear()
+            currentTags.addAll(attachedTags)
+        }
+    }
+
+    // 记录水平 Row 内各 Chip 的原始槽位矩形（相对于 Row 内部滚动区域的局部坐标）
+    var rowCoordinates by remember { mutableStateOf<LayoutCoordinates?>(null) }
+    val chipBoundsMap = remember { mutableStateMapOf<String, Rect>() }
+    var deleteChipBounds by remember { mutableStateOf<Rect?>(null) }
+    val tagsRowScrollState = rememberScrollState()
 
     LaunchedEffect(isCopied) {
         if (isCopied) {
@@ -387,8 +399,9 @@ fun ChapterScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 24.dp),
+                        .horizontalScroll(tagsRowScrollState)
+                        .padding(horizontal = 24.dp)
+                        .onGloballyPositioned { rowCoordinates = it },
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -399,78 +412,158 @@ fun ChapterScreen(
                             onClick = { showAddTagDialog = true }
                         )
                     } else {
-                        currentTags.forEach { tag ->
-                            val isThisDragging = draggingTag?.id == tag.id
+                        val spacingPx = with(density) { 8.dp.toPx() }
+                        val draggedIndex = currentTags.indexOfFirst { it.id == draggingTagId }
+                        val draggedWidth = if (draggedIndex != -1) {
+                            chipBoundsMap[draggingTagId]?.width ?: 0f
+                        } else 0f
+
+                        currentTags.forEachIndexed { index, tag ->
+                            val isThisDragging = draggingTagId == tag.id
+
+                            // 计算相邻项平滑避让插槽位移
+                            val targetShiftX = when {
+                                isThisDragging -> 0f
+                                isHoveringDeleteZone -> {
+                                    if (draggedIndex != -1 && index > draggedIndex) -(draggedWidth + spacingPx) else 0f
+                                }
+                                draggedIndex != -1 && targetSlotIndex != -1 && targetSlotIndex > draggedIndex -> {
+                                    if (index in (draggedIndex + 1)..targetSlotIndex) -(draggedWidth + spacingPx) else 0f
+                                }
+                                draggedIndex != -1 && targetSlotIndex != -1 && targetSlotIndex < draggedIndex -> {
+                                    if (index in targetSlotIndex until draggedIndex) (draggedWidth + spacingPx) else 0f
+                                }
+                                else -> 0f
+                            }
+
+                            val animatedShiftX by animateFloatAsState(
+                                targetValue = targetShiftX,
+                                animationSpec = spring(
+                                    dampingRatio = Spring.DampingRatioMediumBouncy,
+                                    stiffness = Spring.StiffnessMediumLow
+                                ),
+                                label = "chip_shift_${tag.id}"
+                            )
+
                             Box(
                                 modifier = Modifier
-                                    .onGloballyPositioned { coords ->
-                                        chipBoundsMap[tag.id] = coords.boundsInRoot()
-                                    }
+                                    .zIndex(if (isThisDragging) 10f else 1f)
                                     .graphicsLayer {
-                                        alpha = if (isThisDragging) 0.2f else 1.0f
+                                        if (isThisDragging) {
+                                            translationX = dragOffsetX
+                                            scaleX = 1.06f
+                                            scaleY = 1.06f
+                                            shadowElevation = 6.dp.toPx()
+                                            alpha = if (isHoveringDeleteZone) 0.5f else 1.0f
+                                        } else {
+                                            translationX = animatedShiftX
+                                        }
+                                    }
+                                    .onGloballyPositioned { coords ->
+                                        rowCoordinates?.let { rowCoords ->
+                                            if (coords.isAttached && rowCoords.isAttached) {
+                                                chipBoundsMap[tag.id] = rowCoords.localBoundingBoxOf(coords)
+                                            }
+                                        }
                                     }
                                     .pointerInput(tag.id) {
                                         detectDragGesturesAfterLongPress(
                                             onDragStart = { _ ->
                                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                val bounds = chipBoundsMap[tag.id] ?: Rect.Zero
-                                                dragOffsetInRoot = bounds.topLeft
-                                                draggingTag = tag
+                                                draggingTagId = tag.id
+                                                dragOffsetX = 0f
+                                                targetSlotIndex = currentTags.indexOfFirst { it.id == tag.id }
                                                 isHoveringDeleteZone = false
                                             },
                                             onDrag = { change, dragAmount ->
                                                 change.consume()
-                                                dragOffsetInRoot += dragAmount
-                                                val inDeleteZone = dragOffsetInRoot.y <= deleteZoneHeightPx
-                                                if (inDeleteZone != isHoveringDeleteZone) {
-                                                    isHoveringDeleteZone = inDeleteZone
-                                                    if (inDeleteZone) {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    }
-                                                }
+                                                dragOffsetX += dragAmount.x
 
-                                                // 若未处于删除区域，则处理横向邻居碰撞重排
-                                                if (!isHoveringDeleteZone) {
-                                                    val draggedCenterX = dragOffsetInRoot.x + 35.dp.toPx()
-                                                    val currentIndex = currentTags.indexOfFirst { it.id == tag.id }
-                                                    if (currentIndex != -1) {
-                                                        if (currentIndex > 0) {
-                                                            val prevTag = currentTags[currentIndex - 1]
-                                                            val prevBounds = chipBoundsMap[prevTag.id]
-                                                            if (prevBounds != null && draggedCenterX < prevBounds.center.x) {
-                                                                currentTags.add(currentIndex - 1, currentTags.removeAt(currentIndex))
-                                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                val curIdx = currentTags.indexOfFirst { it.id == tag.id }
+                                                val origBounds = chipBoundsMap[tag.id]
+                                                if (curIdx != -1 && origBounds != null) {
+                                                    val currentCenterX = origBounds.center.x + dragOffsetX
+
+                                                    // 1. 检查是否移动到末尾删除区域
+                                                    val delBounds = deleteChipBounds
+                                                    val hoveringDelete = if (delBounds != null) {
+                                                        currentCenterX >= (delBounds.left - spacingPx / 2f)
+                                                    } else {
+                                                        val lastBounds = currentTags.lastOrNull()?.let { chipBoundsMap[it.id] }
+                                                        if (lastBounds != null) currentCenterX >= (lastBounds.right + spacingPx) else false
+                                                    }
+
+                                                    if (hoveringDelete != isHoveringDeleteZone) {
+                                                        isHoveringDeleteZone = hoveringDelete
+                                                        if (hoveringDelete) {
+                                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        }
+                                                    }
+
+                                                    // 2. 若未处于删除区域，计算落位插槽
+                                                    if (!hoveringDelete) {
+                                                        var bestSlot = curIdx
+                                                        var minDistance = Float.MAX_VALUE
+                                                        currentTags.forEachIndexed { slotIdx, slotTag ->
+                                                            val bounds = chipBoundsMap[slotTag.id]
+                                                            if (bounds != null) {
+                                                                val dist = kotlin.math.abs(currentCenterX - bounds.center.x)
+                                                                if (dist < minDistance) {
+                                                                    minDistance = dist
+                                                                    bestSlot = slotIdx
+                                                                }
                                                             }
                                                         }
-                                                        if (currentIndex < currentTags.size - 1) {
-                                                            val nextTag = currentTags[currentIndex + 1]
-                                                            val nextBounds = chipBoundsMap[nextTag.id]
-                                                            if (nextBounds != null && draggedCenterX > nextBounds.center.x) {
-                                                                currentTags.add(currentIndex + 1, currentTags.removeAt(currentIndex))
-                                                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        if (bestSlot != targetSlotIndex) {
+                                                            targetSlotIndex = bestSlot
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        }
+                                                    } else {
+                                                        targetSlotIndex = -1
+                                                    }
+
+                                                    // 3. 拖拽至边缘时自动水平微调滚动
+                                                    rowCoordinates?.let { rowCoords ->
+                                                        val viewportWidth = rowCoords.size.width.toFloat()
+                                                        val xInViewport = currentCenterX - tagsRowScrollState.value
+                                                        if (xInViewport > viewportWidth - 40.dp.toPx() && tagsRowScrollState.value < tagsRowScrollState.maxValue) {
+                                                            coroutineScope.launch {
+                                                                tagsRowScrollState.scrollBy(15f)
+                                                            }
+                                                        } else if (xInViewport < 40.dp.toPx() && tagsRowScrollState.value > 0) {
+                                                            coroutineScope.launch {
+                                                                tagsRowScrollState.scrollBy(-15f)
                                                             }
                                                         }
                                                     }
                                                 }
                                             },
                                             onDragEnd = {
-                                                if (isHoveringDeleteZone) {
-                                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                    onToggleTag(tag.id)
-                                                } else {
-                                                    val newIds = currentTags.map { it.id }
-                                                    val oldIds = attachedTags.map { it.id }
-                                                    if (newIds != oldIds) {
-                                                        onReorderTags(newIds)
+                                                val draggedId = draggingTagId
+                                                if (draggedId != null) {
+                                                    if (isHoveringDeleteZone) {
+                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                        onToggleTag(draggedId)
+                                                    } else if (targetSlotIndex != -1) {
+                                                        val fromIdx = currentTags.indexOfFirst { it.id == draggedId }
+                                                        if (fromIdx != -1 && fromIdx != targetSlotIndex) {
+                                                            val item = currentTags.removeAt(fromIdx)
+                                                            currentTags.add(targetSlotIndex, item)
+                                                            val newIds = currentTags.map { it.id }
+                                                            onReorderTags(newIds)
+                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                        }
                                                     }
                                                 }
-                                                draggingTag = null
+                                                draggingTagId = null
+                                                dragOffsetX = 0f
+                                                targetSlotIndex = -1
                                                 isHoveringDeleteZone = false
                                             },
                                             onDragCancel = {
-                                                currentTags.clear()
-                                                currentTags.addAll(attachedTags)
-                                                draggingTag = null
+                                                draggingTagId = null
+                                                dragOffsetX = 0f
+                                                targetSlotIndex = -1
                                                 isHoveringDeleteZone = false
                                             }
                                         )
@@ -484,10 +577,25 @@ fun ChapterScreen(
                                 )
                             }
                         }
-                        AddTagChip(
-                            label = "添加",
-                            onClick = { showAddTagDialog = true }
-                        )
+
+                        // 末尾操作按钮：拖拽时切换为红色垃圾桶“移除”目标，平常展示“添加”
+                        if (draggingTagId != null) {
+                            DeleteDropTagChip(
+                                isHovering = isHoveringDeleteZone,
+                                modifier = Modifier.onGloballyPositioned { coords ->
+                                    rowCoordinates?.let { rowCoords ->
+                                        if (coords.isAttached && rowCoords.isAttached) {
+                                            deleteChipBounds = rowCoords.localBoundingBoxOf(coords)
+                                        }
+                                    }
+                                }
+                            )
+                        } else {
+                            AddTagChip(
+                                label = "添加",
+                                onClick = { showAddTagDialog = true }
+                            )
+                        }
                     }
                 }
 
@@ -799,49 +907,6 @@ fun ChapterScreen(
                 },
                 onDismissRequest = { showAddTagDialog = false }
             )
-        }
-
-        // 顶部红色垃圾桶区域（拖拽时从顶部滑入）
-        AnimatedVisibility(
-            visible = draggingTag != null,
-            enter = slideInVertically { -it } + fadeIn(),
-            exit = slideOutVertically { -it } + fadeOut(),
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .zIndex(90f)
-                .onGloballyPositioned { coords ->
-                    deleteZoneHeightPx = coords.size.height.toFloat()
-                }
-        ) {
-            TopDeleteDropZone(isHovering = isHoveringDeleteZone)
-        }
-
-        // 随手指拖拽浮动的预览 Chip
-        if (draggingTag != null) {
-            Box(
-                modifier = Modifier
-                    .offset {
-                        IntOffset(
-                            dragOffsetInRoot.x.roundToInt(),
-                            dragOffsetInRoot.y.roundToInt()
-                        )
-                    }
-                    .zIndex(100f)
-                    .graphicsLayer {
-                        scaleX = 1.08f
-                        scaleY = 1.08f
-                        shadowElevation = 12.dp.toPx()
-                        alpha = if (isHoveringDeleteZone) 0.8f else 1.0f
-                    }
-            ) {
-                TagChip(
-                    name = draggingTag!!.name,
-                    colorHex = if (isHoveringDeleteZone) "#C04851" else draggingTag!!.colorHex,
-                    icon = draggingTag!!.icon,
-                    onClick = {}
-                )
-            }
         }
     }
 }
