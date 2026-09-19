@@ -8,8 +8,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.ui.graphics.lerp
 import kotlinx.coroutines.Job
@@ -20,10 +18,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -58,14 +54,13 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -73,97 +68,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.withFrameMillis
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.model.Chapter
 import com.ilunyu.lunyu.data.model.Pian
-import com.ilunyu.lunyu.ui.tag.AddTagChip
 import com.ilunyu.lunyu.ui.tag.AddTagDialog
-import com.ilunyu.lunyu.ui.tag.TagChip
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/**
- * 拖拽排序标签时，末尾展示的红色垃圾桶移除插槽（尺寸与添加标签 Chip 完全固定一致，悬停时不形变）
- */
-@Composable
-private fun DeleteDropTagChip(
-    isHovering: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val containerColor by animateColorAsState(
-        targetValue = if (isHovering) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer,
-        animationSpec = tween(durationMillis = 150),
-        label = "delete_chip_bg"
-    )
-    val contentColor by animateColorAsState(
-        targetValue = if (isHovering) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
-        animationSpec = tween(durationMillis = 150),
-        label = "delete_chip_content"
-    )
-
-    FilterChip(
-        selected = false,
-        onClick = {},
-        label = {
-            Text(
-                text = "移除",
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                maxLines = 1
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = if (isHovering) Icons.Filled.Delete else Icons.Outlined.Delete,
-                contentDescription = "移除标签",
-                modifier = Modifier.size(16.dp)
-            )
-        },
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = containerColor,
-            labelColor = contentColor,
-            iconColor = contentColor
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
-            selected = false,
-            borderColor = if (isHovering) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.error.copy(alpha = 0.5f)
-        ),
-        modifier = modifier
-    )
-}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -190,8 +103,6 @@ fun ChapterScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
 
     var showAddTagDialog by remember { mutableStateOf(false) }
     var isCopied by remember { mutableStateOf(false) }
@@ -200,24 +111,6 @@ fun ChapterScreen(
     var highlightJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
     var scrollJob by remember(chapter.id) { mutableStateOf<Job?>(null) }
 
-    // 标签行内拖拽排序与删除状态（基于 LazyRow）
-    var draggingTagId by remember { mutableStateOf<String?>(null) }
-    var dragDistanceX by remember { mutableFloatStateOf(0f) }
-    var isHoveringDeleteZone by remember { mutableStateOf(false) }
-    var autoScrollJob by remember { mutableStateOf<Job?>(null) }
-
-    // 本章节标签在内存中的实时可重排列表
-    val currentTags = remember(attachedTags) {
-        mutableStateListOf<TagEntity>().apply { addAll(attachedTags) }
-    }
-    LaunchedEffect(attachedTags) {
-        if (draggingTagId == null) {
-            currentTags.clear()
-            currentTags.addAll(attachedTags)
-        }
-    }
-
-    val tagsListState = rememberLazyListState()
 
     LaunchedEffect(isCopied) {
         if (isCopied) {
@@ -384,260 +277,14 @@ fun ChapterScreen(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // 标签 Chips 行（基于 LazyRow 实现高性能、零布局反馈循环的平滑重排）
-                if (currentTags.isEmpty()) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp)
-                    ) {
-                        AddTagChip(
-                            label = "添加一个标签",
-                            onClick = { showAddTagDialog = true }
-                        )
-                    }
-                } else {
-                    val spacingPx = with(density) { 8.dp.toPx() }
-                    val hysteresisPx = with(density) { 8.dp.toPx() }
-                    val edgeThresholdPx = with(density) { 48.dp.toPx() }
-
-                    // 检查并执行相邻槽位交换的统一函数
-                    val checkAndPerformSwap: () -> Unit = {
-                        val key = draggingTagId
-                        if (key != null) {
-                            val layoutInfo = tagsListState.layoutInfo
-                            val visibleItems = layoutInfo.visibleItemsInfo
-                            val currentItemInfo = visibleItems.firstOrNull { it.key == key }
-                            if (currentItemInfo != null) {
-                                val currentCenter = currentItemInfo.offset + currentItemInfo.size / 2f + dragDistanceX
-
-                                // 1. 检查是否悬停在末尾固定操作槽上
-                                val trailingItemInfo = visibleItems.firstOrNull { it.key == "trailing_action" }
-                                val inDelete = if (trailingItemInfo != null) {
-                                    currentCenter >= (trailingItemInfo.offset - spacingPx)
-                                } else false
-
-                                if (inDelete != isHoveringDeleteZone) {
-                                    isHoveringDeleteZone = inDelete
-                                    if (inDelete) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    }
-                                }
-
-                                // 2. 若未悬停在删除槽上，检测相邻项交换
-                                if (!inDelete) {
-                                    val curIdx = currentTags.indexOfFirst { it.id == key }
-                                    if (curIdx != -1) {
-                                        // 向左拖拽（与前一项交换）
-                                        if (curIdx > 0) {
-                                            val prevTag = currentTags[curIdx - 1]
-                                            val prevItemInfo = visibleItems.firstOrNull { it.key == prevTag.id }
-                                            if (prevItemInfo != null) {
-                                                val prevCenter = prevItemInfo.offset + prevItemInfo.size / 2f
-                                                if (currentCenter < prevCenter - hysteresisPx) {
-                                                    val shiftDistance = prevItemInfo.size + spacingPx
-                                                    dragDistanceX += shiftDistance
-                                                    val item = currentTags.removeAt(curIdx)
-                                                    currentTags.add(curIdx - 1, item)
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                }
-                                            }
-                                        }
-                                        // 向右拖拽（与后一项交换）
-                                        else if (curIdx < currentTags.size - 1) {
-                                            val nextTag = currentTags[curIdx + 1]
-                                            val nextItemInfo = visibleItems.firstOrNull { it.key == nextTag.id }
-                                            if (nextItemInfo != null) {
-                                                val nextCenter = nextItemInfo.offset + nextItemInfo.size / 2f
-                                                if (currentCenter > nextCenter + hysteresisPx) {
-                                                    val shiftDistance = nextItemInfo.size + spacingPx
-                                                    dragDistanceX -= shiftDistance
-                                                    val item = currentTags.removeAt(curIdx)
-                                                    currentTags.add(curIdx + 1, item)
-                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // 统一自动滚动触发函数（单协程逐帧循环）
-                    val updateAutoScroll: () -> Unit = {
-                        val key = draggingTagId
-                        if (key != null) {
-                            val layoutInfo = tagsListState.layoutInfo
-                            val viewportWidth = layoutInfo.viewportSize.width.toFloat()
-                            val currentItemInfo = layoutInfo.visibleItemsInfo.firstOrNull { it.key == key }
-                            if (currentItemInfo != null && viewportWidth > 0f) {
-                                val currentCenter = currentItemInfo.offset + currentItemInfo.size / 2f + dragDistanceX
-                                val needScrollRight = currentCenter > viewportWidth - edgeThresholdPx && tagsListState.canScrollForward
-                                val needScrollLeft = currentCenter < edgeThresholdPx && tagsListState.canScrollBackward
-
-                                if (needScrollRight || needScrollLeft) {
-                                    if (autoScrollJob == null || autoScrollJob?.isActive == false) {
-                                        autoScrollJob = coroutineScope.launch {
-                                            while (isActive) {
-                                                val lInfo = tagsListState.layoutInfo
-                                                val vWidth = lInfo.viewportSize.width.toFloat()
-                                                val cInfo = lInfo.visibleItemsInfo.firstOrNull { it.key == draggingTagId }
-                                                if (cInfo == null || vWidth <= 0f) break
-
-                                                val center = cInfo.offset + cInfo.size / 2f + dragDistanceX
-                                                val speed = if (center > vWidth - edgeThresholdPx && tagsListState.canScrollForward) {
-                                                    val ratio = ((center - (vWidth - edgeThresholdPx)) / edgeThresholdPx).coerceIn(0f, 1f)
-                                                    (ratio * with(density) { 14.dp.toPx() }).coerceAtLeast(4f)
-                                                } else if (center < edgeThresholdPx && tagsListState.canScrollBackward) {
-                                                    val ratio = ((edgeThresholdPx - center) / edgeThresholdPx).coerceIn(0f, 1f)
-                                                    -(ratio * with(density) { 14.dp.toPx() }).coerceAtLeast(4f)
-                                                } else {
-                                                    break
-                                                }
-
-                                                val consumed = tagsListState.scrollBy(speed)
-                                                if (consumed == 0f) break
-                                                dragDistanceX += consumed
-                                                checkAndPerformSwap()
-                                                withFrameMillis { }
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    autoScrollJob?.cancel()
-                                    autoScrollJob = null
-                                }
-                            }
-                        }
-                    }
-
-                    LazyRow(
-                        state = tagsListState,
-                        modifier = Modifier.fillMaxWidth(),
-                        contentPadding = PaddingValues(horizontal = 24.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        items(
-                            items = currentTags,
-                            key = { it.id }
-                        ) { tag ->
-                            val isDragging = tag.id == draggingTagId
-
-                            Box(
-                                modifier = Modifier
-                                    .then(
-                                        if (isDragging) {
-                                            Modifier
-                                                .zIndex(10f)
-                                                .graphicsLayer {
-                                                    translationX = dragDistanceX
-                                                    scaleX = 1.05f
-                                                    scaleY = 1.05f
-                                                    shadowElevation = 6.dp.toPx()
-                                                    alpha = if (isHoveringDeleteZone) 0.5f else 1.0f
-                                                }
-                                        } else {
-                                            Modifier
-                                                .zIndex(1f)
-                                                .animateItem(
-                                                    fadeInSpec = null,
-                                                    fadeOutSpec = null,
-                                                    placementSpec = spring(
-                                                        dampingRatio = Spring.DampingRatioNoBouncy,
-                                                        stiffness = Spring.StiffnessMedium
-                                                    )
-                                                )
-                                        }
-                                    )
-                                    .pointerInput(tag.id) {
-                                        detectDragGesturesAfterLongPress(
-                                            onDragStart = { _ ->
-                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                draggingTagId = tag.id
-                                                dragDistanceX = 0f
-                                                isHoveringDeleteZone = false
-                                            },
-                                            onDrag = { change, dragAmount ->
-                                                change.consume()
-                                                dragDistanceX += dragAmount.x
-                                                checkAndPerformSwap()
-                                                updateAutoScroll()
-                                            },
-                                            onDragEnd = {
-                                                autoScrollJob?.cancel()
-                                                autoScrollJob = null
-                                                val draggedId = draggingTagId
-                                                if (draggedId != null) {
-                                                    if (isHoveringDeleteZone) {
-                                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                                        onToggleTag(draggedId)
-                                                    } else {
-                                                        val newIds = currentTags.map { it.id }
-                                                        val oldIds = attachedTags.map { it.id }
-                                                        if (newIds != oldIds) {
-                                                            onReorderTags(newIds)
-                                                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                                        }
-                                                    }
-                                                }
-                                                draggingTagId = null
-                                                dragDistanceX = 0f
-                                                isHoveringDeleteZone = false
-                                            },
-                                            onDragCancel = {
-                                                autoScrollJob?.cancel()
-                                                autoScrollJob = null
-                                                draggingTagId = null
-                                                dragDistanceX = 0f
-                                                isHoveringDeleteZone = false
-                                                currentTags.clear()
-                                                currentTags.addAll(attachedTags)
-                                            }
-                                        )
-                                    }
-                            ) {
-                                TagChip(
-                                    name = tag.name,
-                                    colorHex = tag.colorHex,
-                                    icon = tag.icon,
-                                    onClick = {
-                                        if (draggingTagId == null) {
-                                            onNavigateToTag(tag.id)
-                                        }
-                                    }
-                                )
-                            }
-                        }
-
-                        // 末尾固定尺寸操作项（添加 / 移除）
-                        item(key = "trailing_action") {
-                            Box(
-                                modifier = Modifier
-                                    .animateItem(
-                                        fadeInSpec = null,
-                                        fadeOutSpec = null,
-                                        placementSpec = spring(
-                                            dampingRatio = Spring.DampingRatioNoBouncy,
-                                            stiffness = Spring.StiffnessMedium
-                                        )
-                                    )
-                            ) {
-                                if (draggingTagId != null) {
-                                    DeleteDropTagChip(
-                                        isHovering = isHoveringDeleteZone
-                                    )
-                                } else {
-                                    AddTagChip(
-                                        label = "添加",
-                                        onClick = { showAddTagDialog = true }
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
+                ReorderableChapterTags(
+                    chapterId = chapter.id,
+                    tags = attachedTags,
+                    onAdd = { showAddTagDialog = true },
+                    onNavigate = onNavigateToTag,
+                    onRemove = onToggleTag,
+                    onReorder = onReorderTags
+                )
 
                 Spacer(modifier = Modifier.height(48.dp))
 
