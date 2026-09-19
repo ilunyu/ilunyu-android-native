@@ -236,6 +236,7 @@ internal fun ReorderableChapterTags(
                                 labelColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
                                 iconColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
                             ),
+                            border = null,
                             modifier = Modifier.height(32.dp)
                         )
                     }
