@@ -131,8 +131,8 @@ fun TagChip(
             label = {
                 Text(
                     text = cleanName,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 13.sp,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     ),
                     maxLines = 1
@@ -144,13 +144,13 @@ fun TagChip(
                         Icon(
                             imageVector = iconVector,
                             contentDescription = null,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     } else if (hasColor) {
                         val tagColor = parseTagColor(colorHex)
                         Box(
                             modifier = Modifier
-                                .size(7.dp)
+                                .size(8.dp)
                                 .background(color = tagColor, shape = CircleShape)
                         )
                     }
@@ -168,7 +168,7 @@ fun TagChip(
                 borderColor = MaterialTheme.colorScheme.outlineVariant
             ),
             modifier = Modifier
-                .height(28.dp)
+                .height(32.dp)
                 .then(modifier)
         )
     }
@@ -191,8 +191,8 @@ fun AddTagChip(
             label = {
                 Text(
                     text = label,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontSize = 13.sp,
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Medium
                     ),
                     maxLines = 1
@@ -202,7 +202,7 @@ fun AddTagChip(
                 Icon(
                     imageVector = Icons.Outlined.NewLabel,
                     contentDescription = label,
-                    modifier = Modifier.size(14.dp)
+                    modifier = Modifier.size(16.dp)
                 )
             },
             shape = RoundedCornerShape(8.dp),
@@ -217,7 +217,7 @@ fun AddTagChip(
                 borderColor = MaterialTheme.colorScheme.outlineVariant
             ),
             modifier = Modifier
-                .height(28.dp)
+                .height(32.dp)
                 .then(modifier)
         )
     }

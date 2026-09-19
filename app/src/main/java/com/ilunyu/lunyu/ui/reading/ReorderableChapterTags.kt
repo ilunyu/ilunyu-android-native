@@ -224,19 +224,19 @@ internal fun ReorderableChapterTags(
                             label = {
                                 Text(
                                     text = "移除",
-                                    style = MaterialTheme.typography.labelMedium.copy(
-                                        fontSize = 13.sp,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontSize = 14.sp,
                                         fontWeight = FontWeight.Medium
                                     )
                                 )
                             },
-                            leadingIcon = { Icon(Icons.Outlined.Delete, "移除标签", Modifier.size(14.dp)) },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, "移除标签", Modifier.size(16.dp)) },
                             colors = FilterChipDefaults.filterChipColors(
                                 containerColor = if (session.deleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer,
                                 labelColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
                                 iconColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
                             ),
-                            modifier = Modifier.height(28.dp)
+                            modifier = Modifier.height(32.dp)
                         )
                     }
                 }
