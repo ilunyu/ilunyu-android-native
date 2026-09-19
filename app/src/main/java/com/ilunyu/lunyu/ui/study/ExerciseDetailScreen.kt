@@ -78,12 +78,10 @@ import com.ilunyu.lunyu.data.model.Exercise
 import com.ilunyu.lunyu.data.model.ExerciseBlock
 import com.ilunyu.lunyu.data.model.ExerciseFormat
 
-import androidx.compose.material.icons.automirrored.filled.Label
-import androidx.compose.material.icons.automirrored.outlined.Label
 import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.data.db.TagWithCounts
-import com.ilunyu.lunyu.ui.tag.TagChip
-import com.ilunyu.lunyu.ui.tag.TagSelectionBottomSheet
+import com.ilunyu.lunyu.ui.tag.AddTagDialog
+import com.ilunyu.lunyu.ui.tag.ReorderableItemTags
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -93,7 +91,9 @@ fun ExerciseDetailScreen(
     attachedTags: List<TagEntity> = emptyList(),
     allTags: List<TagWithCounts> = emptyList(),
     onToggleTag: (String) -> Unit = {},
-    onCreateTag: (String, String?) -> Unit = { _, _ -> },
+    onCreateTag: (String, String?, String?) -> Unit = { _, _, _ -> },
+    onNavigateToTag: (String) -> Unit = {},
+    onReorderTags: (List<String>) -> Unit = {},
     scrollIndex: Int = 0,
     scrollOffset: Int = 0,
     onSaveScroll: (Int, Int) -> Unit = { _, _ -> },
@@ -103,7 +103,7 @@ fun ExerciseDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var showTagSheet by remember { mutableStateOf(false) }
+    var showAddTagDialog by remember { mutableStateOf(false) }
     val lazyListState = rememberLazyListState(
         initialFirstVisibleItemIndex = scrollIndex,
         initialFirstVisibleItemScrollOffset = scrollOffset
@@ -160,14 +160,6 @@ fun ExerciseDetailScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = { showTagSheet = true }) {
-                        val hasTags = attachedTags.isNotEmpty()
-                        Icon(
-                            imageVector = if (hasTags) Icons.AutoMirrored.Filled.Label else Icons.AutoMirrored.Outlined.Label,
-                            contentDescription = "标签",
-                            tint = if (hasTags) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
                     IconButton(onClick = onToggleFavorite) {
                         Icon(
                             imageVector = if (isFavorite) Icons.Default.Bookmark else Icons.Outlined.BookmarkBorder,
@@ -239,23 +231,6 @@ fun ExerciseDetailScreen(
                             )
                         }
                     }
-
-                    if (attachedTags.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            attachedTags.forEach { tag ->
-                                TagChip(
-                                    name = tag.name,
-                                    colorHex = tag.colorHex,
-                                    icon = tag.icon,
-                                    onClick = { showTagSheet = true }
-                                )
-                            }
-                        }
-                    }
                 }
             }
 
@@ -276,9 +251,20 @@ fun ExerciseDetailScreen(
                 )
             }
 
-            // 原文与答案之间留出 48dp 留白（36dp Spacer + 12dp 行内上边距 = 48dp）
+            // 题目内容与答案之间的标签行（上间距 12dp，“答案与解析”上间距 48dp）
             item {
-                Spacer(modifier = Modifier.height(36.dp))
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    ReorderableItemTags(
+                        itemId = exercise.id,
+                        tags = attachedTags,
+                        onAdd = { showAddTagDialog = true },
+                        onNavigate = onNavigateToTag,
+                        onRemove = onToggleTag,
+                        onReorder = onReorderTags
+                    )
+                    Spacer(modifier = Modifier.height(48.dp))
+                }
             }
 
             // 3. 答案与解析标题（整行全宽矩形水波纹可点按；单独点按右侧图标触发局部圆形水波纹）
@@ -360,14 +346,17 @@ fun ExerciseDetailScreen(
             item { Spacer(modifier = Modifier.height(48.dp)) }
         }
 
-        if (showTagSheet) {
-            TagSelectionBottomSheet(
-                targetTitle = exercise.title,
-                allTags = allTags,
+        if (showAddTagDialog) {
+            AddTagDialog(
+                allExistingTags = allTags.map { it.tag },
                 attachedTagIds = attachedTags.map { it.id }.toSet(),
-                onToggleTag = onToggleTag,
-                onCreateTag = onCreateTag,
-                onDismissRequest = { showTagSheet = false }
+                onSelectExistingTag = { existingTag ->
+                    onToggleTag(existingTag.id)
+                },
+                onCreateNewTag = { name, color, icon ->
+                    onCreateTag(name, color, icon)
+                },
+                onDismissRequest = { showAddTagDialog = false }
             )
         }
     }
