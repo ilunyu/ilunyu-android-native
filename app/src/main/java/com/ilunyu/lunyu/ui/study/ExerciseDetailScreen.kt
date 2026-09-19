@@ -251,10 +251,10 @@ fun ExerciseDetailScreen(
                 )
             }
 
-            // 题目内容与答案之间的标签行（上间距 12dp，“答案与解析”上间距 48dp）
+            // 题目内容与答案之间的标签行（上间距 24dp，“答案与解析”上间距 48dp）
             item {
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(24.dp))
                     ReorderableItemTags(
                         itemId = exercise.id,
                         tags = attachedTags,
