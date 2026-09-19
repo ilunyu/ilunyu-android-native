@@ -282,7 +282,7 @@ fun ChapterScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(24.dp))
 
                 ReorderableChapterTags(
                     chapterId = chapter.id,
