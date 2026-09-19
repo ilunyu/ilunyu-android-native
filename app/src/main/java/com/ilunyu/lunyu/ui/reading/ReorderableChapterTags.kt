@@ -20,8 +20,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.ui.tag.AddTagChip
@@ -214,17 +217,28 @@ internal fun ReorderableChapterTags(
                 if (session == null) {
                     AddTagChip(if (displayed.isEmpty()) "添加一个标签" else "添加", onAdd)
                 } else {
-                    FilterChip(
-                        selected = false, onClick = {},
-                        shape = RoundedCornerShape(8.dp),
-                        label = { Text("移除") },
-                        leadingIcon = { Icon(Icons.Outlined.Delete, "移除标签", Modifier.size(16.dp)) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = if (session.deleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer,
-                            labelColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
-                            iconColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
+                    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+                        FilterChip(
+                            selected = false, onClick = {},
+                            shape = RoundedCornerShape(8.dp),
+                            label = {
+                                Text(
+                                    text = "移除",
+                                    style = MaterialTheme.typography.labelMedium.copy(
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            },
+                            leadingIcon = { Icon(Icons.Outlined.Delete, "移除标签", Modifier.size(14.dp)) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                containerColor = if (session.deleting) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.errorContainer,
+                                labelColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer,
+                                iconColor = if (session.deleting) MaterialTheme.colorScheme.onError else MaterialTheme.colorScheme.onErrorContainer
+                            ),
+                            modifier = Modifier.height(28.dp)
                         )
-                    )
+                    }
                 }
             }
         }
@@ -240,6 +254,8 @@ internal fun ReorderableChapterTags(
                     .zIndex(1f)
                     .graphicsLayer {
                         translationX = session.viewportLeft
+                        scaleX = 1.05f
+                        scaleY = 1.05f
                         shadowElevation = 4.dp.toPx()
                         shape = RoundedCornerShape(8.dp)
                         clip = false

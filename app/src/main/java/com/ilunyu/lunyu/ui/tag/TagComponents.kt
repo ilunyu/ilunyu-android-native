@@ -54,6 +54,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -121,50 +124,54 @@ fun TagChip(
     val iconVector = getTagImageVector(icon)
     val hasColor = !colorHex.isNullOrBlank()
 
-    FilterChip(
-        selected = false,
-        onClick = { onClick?.invoke() },
-        label = {
-            Text(
-                text = cleanName,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                maxLines = 1
-            )
-        },
-        leadingIcon = if (iconVector != null || hasColor) {
-            {
-                if (iconVector != null) {
-                    Icon(
-                        imageVector = iconVector,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                } else if (hasColor) {
-                    val tagColor = parseTagColor(colorHex)
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(color = tagColor, shape = CircleShape)
-                    )
-                }
-            }
-        } else null,
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        FilterChip(
             selected = false,
-            borderColor = MaterialTheme.colorScheme.outlineVariant
-        ),
-        modifier = modifier
-    )
+            onClick = { onClick?.invoke() },
+            label = {
+                Text(
+                    text = cleanName,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    maxLines = 1
+                )
+            },
+            leadingIcon = if (iconVector != null || hasColor) {
+                {
+                    if (iconVector != null) {
+                        Icon(
+                            imageVector = iconVector,
+                            contentDescription = null,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    } else if (hasColor) {
+                        val tagColor = parseTagColor(colorHex)
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(color = tagColor, shape = CircleShape)
+                        )
+                    }
+                }
+            } else null,
+            shape = RoundedCornerShape(8.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = false,
+                borderColor = MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier
+                .height(28.dp)
+                .then(modifier)
+        )
+    }
 }
 
 /**
@@ -177,39 +184,43 @@ fun AddTagChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FilterChip(
-        selected = false,
-        onClick = onClick,
-        label = {
-            Text(
-                text = label,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium
-                ),
-                maxLines = 1
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Outlined.NewLabel,
-                contentDescription = label,
-                modifier = Modifier.size(16.dp)
-            )
-        },
-        shape = RoundedCornerShape(8.dp),
-        colors = FilterChipDefaults.filterChipColors(
-            containerColor = MaterialTheme.colorScheme.surface,
-            labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
-            iconColor = MaterialTheme.colorScheme.onSurfaceVariant
-        ),
-        border = FilterChipDefaults.filterChipBorder(
-            enabled = true,
+    CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides Dp.Unspecified) {
+        FilterChip(
             selected = false,
-            borderColor = MaterialTheme.colorScheme.outlineVariant
-        ),
-        modifier = modifier
-    )
+            onClick = onClick,
+            label = {
+                Text(
+                    text = label,
+                    style = MaterialTheme.typography.labelMedium.copy(
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium
+                    ),
+                    maxLines = 1
+                )
+            },
+            leadingIcon = {
+                Icon(
+                    imageVector = Icons.Outlined.NewLabel,
+                    contentDescription = label,
+                    modifier = Modifier.size(14.dp)
+                )
+            },
+            shape = RoundedCornerShape(8.dp),
+            colors = FilterChipDefaults.filterChipColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+                labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                iconColor = MaterialTheme.colorScheme.onSurfaceVariant
+            ),
+            border = FilterChipDefaults.filterChipBorder(
+                enabled = true,
+                selected = false,
+                borderColor = MaterialTheme.colorScheme.outlineVariant
+            ),
+            modifier = Modifier
+                .height(28.dp)
+                .then(modifier)
+        )
+    }
 }
 
 /**
