@@ -237,13 +237,14 @@ internal fun ReorderableChapterTags(
                         with(density) { session.sizes[session.from].width.toDp() },
                         with(density) { session.sizes[session.from].height.toDp() }
                     )
-                    .zIndex(1f).graphicsLayer {
-                    translationX = session.viewportLeft
-                    scaleX = 1.05f
-                    scaleY = 1.05f
-                    shadowElevation = 6.dp.toPx()
-                    alpha = if (session.deleting) 0.5f else 1f
-                }
+                    .zIndex(1f)
+                    .graphicsLayer {
+                        translationX = session.viewportLeft
+                        shadowElevation = 4.dp.toPx()
+                        shape = RoundedCornerShape(8.dp)
+                        clip = false
+                        alpha = if (session.deleting) 0.5f else 1f
+                    }
             )
         }
     }
