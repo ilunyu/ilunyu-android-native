@@ -479,6 +479,7 @@ fun MainScreen(
                                 isFavorite = favoriteChapters.contains(chapter.id),
                                 attachedTags = attachedTags,
                                 allTags = tagsWithCounts,
+                                exercises = exercises,
                                 onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "CHAPTER", chapter.id) },
                                 onCreateTag = { name, color, icon -> viewModel.createTagAndAttach(name, color, icon, "CHAPTER", chapter.id) },
                                 onNavigateToTag = { tagId ->

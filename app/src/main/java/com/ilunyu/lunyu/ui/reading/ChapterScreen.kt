@@ -28,11 +28,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Quiz
+import com.ilunyu.lunyu.data.model.Exercise
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.draw.clip
@@ -90,6 +93,7 @@ fun ChapterScreen(
     isFavorite: Boolean,
     attachedTags: List<TagEntity> = emptyList(),
     allTags: List<TagWithCounts> = emptyList(),
+    exercises: List<Exercise> = emptyList(),
     onToggleTag: (String) -> Unit = {},
     onCreateTag: (String, String?, String?) -> Unit = { _, _, _ -> },
     onNavigateToTag: (String) -> Unit = {},
@@ -105,6 +109,7 @@ fun ChapterScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val exerciseMap = remember(exercises) { exercises.associateBy { it.id } }
 
     var showAddTagDialog by remember { mutableStateOf(false) }
     var isCopied by remember { mutableStateOf(false) }
@@ -478,39 +483,113 @@ fun ChapterScreen(
                             )
                         )
                     } else {
+                        val cardShape = RoundedCornerShape(16.dp)
+                        val cardColors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainer
+                        )
                         chapter.relatedQuestions.forEachIndexed { qIdx, q ->
+                            val fullExercise = exerciseMap[q.id]
+                            val monthLabel = fullExercise?.monthLabel?.ifBlank { null } ?: q.year
+                            val number = fullExercise?.number ?: 0
+                            val score = fullExercise?.score ?: 0
+                            val hasNumberAndScore = number > 0 && score > 0
+
                             Card(
                                 onClick = { onNavigateToExercise(q.id) },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = if (qIdx == chapter.relatedQuestions.size - 1) 0.dp else 8.dp)
-                                    .clip(RoundedCornerShape(12.dp)),
-                                shape = RoundedCornerShape(12.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow
-                                )
+                                    .clip(cardShape),
+                                shape = cardShape,
+                                colors = cardColors,
+                                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                             ) {
-                                Row(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
+                                        .padding(horizontal = 16.dp, vertical = 14.dp)
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Outlined.Quiz,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(10.dp))
                                     Text(
-                                        text = q.title,
-                                        style = MaterialTheme.typography.bodyMedium.copy(
+                                        text = fullExercise?.title ?: q.title,
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontSize = 16.sp,
                                             fontWeight = FontWeight.Medium,
+                                            lineHeight = 24.sp,
                                             color = MaterialTheme.colorScheme.onSurface
-                                        ),
-                                        modifier = Modifier.weight(1f)
+                                        )
                                     )
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.weight(1f, fill = false),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            if (monthLabel.isNotBlank()) {
+                                                Icon(
+                                                    imageVector = Icons.Outlined.CalendarMonth,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = monthLabel,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                )
+                                                Spacer(modifier = Modifier.width(16.dp))
+                                            }
+
+                                            if (hasNumberAndScore) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Outlined.Assignment,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = "第${number}题 · 满分${score}分",
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                )
+                                            } else if (q.type.isNotBlank()) {
+                                                Icon(
+                                                    imageVector = Icons.AutoMirrored.Outlined.Assignment,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(14.dp),
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text(
+                                                    text = q.type,
+                                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                                        fontSize = 14.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.width(8.dp))
+
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                            contentDescription = "查看试题",
+                                            modifier = Modifier.size(16.dp),
+                                            tint = MaterialTheme.colorScheme.primary
+                                        )
+                                    }
                                 }
                             }
                         }

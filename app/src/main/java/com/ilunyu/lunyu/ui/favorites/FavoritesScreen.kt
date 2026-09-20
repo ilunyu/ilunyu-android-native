@@ -301,7 +301,7 @@ fun FavoritesScreen(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable { menuExpanded = true }
-                                .padding(horizontal = 4.dp, vertical = 6.dp)
+                                .padding(vertical = 6.dp)
                         ) {
                             if (activeTag != null) {
                                 val iconVector = getTagImageVector(activeTag.icon)
