@@ -100,6 +100,9 @@ class TagRepository(private val tagDao: TagDao) {
         if (trimmedName.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能为空"))
         }
+        if (trimmedName == "收藏" || trimmedName == "全部收藏") {
+            return@withContext Result.failure(IllegalArgumentException("不能使用系统预留名称“$trimmedName”"))
+        }
         if (trimmedName.length > 10) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能超过10个字符"))
         }
@@ -144,6 +147,9 @@ class TagRepository(private val tagDao: TagDao) {
         val trimmedName = name.trim().removePrefix("#").trim()
         if (trimmedName.isBlank()) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能为空"))
+        }
+        if (trimmedName == "收藏" || trimmedName == "全部收藏") {
+            return@withContext Result.failure(IllegalArgumentException("不能使用系统预留名称“$trimmedName”"))
         }
         if (trimmedName.length > 10) {
             return@withContext Result.failure(IllegalArgumentException("标签名称不能超过10个字符"))

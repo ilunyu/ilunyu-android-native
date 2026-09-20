@@ -19,10 +19,14 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -148,7 +152,10 @@ fun TagDetailScreen(
         }
     }
 
-    // 标签编辑/删除对话框状态
+    val allExistingTags = remember(tagsWithCounts) { tagsWithCounts.map { it.tag } }
+
+    // 标签编辑/删除对话框及菜单状态
+    var menuExpanded by remember { mutableStateOf(false) }
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteDialog by remember { mutableStateOf(false) }
 
@@ -199,36 +206,69 @@ fun TagDetailScreen(
                         } else if (!tag.colorHex.isNullOrBlank()) {
                             Box(
                                 modifier = Modifier
-                                    .size(10.dp)
+                                    .size(20.dp)
                                     .background(tagColor, shape = CircleShape)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
                         Text(
                             text = tag.name,
-                            style = MaterialTheme.typography.titleMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 18.sp
+                            style = MaterialTheme.typography.titleLarge.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 20.sp
                             ),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                     }
 
-                    IconButton(onClick = { showEditDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = "编辑标签",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-
-                    IconButton(onClick = { showDeleteDialog = true }) {
-                        Icon(
-                            imageVector = Icons.Outlined.Delete,
-                            contentDescription = "删除标签",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                    Box {
+                        IconButton(onClick = { menuExpanded = true }) {
+                            Icon(
+                                imageVector = Icons.Default.MoreHoriz,
+                                contentDescription = "更多操作",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = menuExpanded,
+                            onDismissRequest = { menuExpanded = false },
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Edit,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                },
+                                text = { Text("编辑标签") },
+                                onClick = {
+                                    menuExpanded = false
+                                    showEditDialog = true
+                                }
+                            )
+                            DropdownMenuItem(
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = Icons.Outlined.Delete,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                text = {
+                                    Text(
+                                        text = "删除标签",
+                                        color = MaterialTheme.colorScheme.error
+                                    )
+                                },
+                                onClick = {
+                                    menuExpanded = false
+                                    showDeleteDialog = true
+                                }
+                            )
+                        }
                     }
                 }
 
@@ -391,9 +431,11 @@ fun TagDetailScreen(
     if (showEditDialog) {
         TagEditDialog(
             initialName = tag.name,
-            initialColorHex = tag.colorHex ?: TAG_PRESET_COLORS.first(),
-            onConfirm = { newName, newColorHex ->
-                viewModel.updateTag(tag.id, newName, newColorHex)
+            initialColorHex = tag.colorHex,
+            initialIcon = tag.icon,
+            allExistingTags = allExistingTags,
+            onConfirm = { newName, newColorHex, newIcon ->
+                viewModel.updateTag(tag.id, newName, newColorHex, newIcon)
                 showEditDialog = false
             },
             onDismiss = { showEditDialog = false }

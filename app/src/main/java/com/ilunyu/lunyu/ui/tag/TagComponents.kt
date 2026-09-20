@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -30,7 +31,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Lightbulb
 import androidx.compose.material.icons.outlined.NewLabel
 import androidx.compose.material.icons.outlined.Person
@@ -56,6 +58,7 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.material3.LocalMinimumInteractiveComponentSize
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -69,6 +72,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
@@ -150,7 +154,7 @@ fun TagChip(
                         val tagColor = parseTagColor(colorHex)
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(14.dp)
                                 .background(color = tagColor, shape = CircleShape)
                         )
                     }
@@ -258,7 +262,7 @@ fun TagActionDialog(
                 } else if (hasColor) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(16.dp)
                             .background(color = parseTagColor(colorHex), shape = CircleShape)
                     )
                 }
@@ -437,8 +441,12 @@ fun TagSelectionBottomSheet(
                     onClick = {
                         val trimmed = newTagName.trim()
                         if (trimmed.isNotBlank()) {
-                            onCreateTag(trimmed, null)
-                            newTagName = ""
+                            if (trimmed == "收藏" || trimmed == "全部收藏") {
+                                errorMessage = "不能使用系统预留名称“$trimmed”"
+                            } else {
+                                onCreateTag(trimmed, null)
+                                newTagName = ""
+                            }
                         } else {
                             errorMessage = "标签名不能为空"
                         }
@@ -558,111 +566,232 @@ fun TagSelectionBottomSheet(
 }
 
 /**
- * 标签编辑/重命名对话框
+ * 标签编辑/重命名对话框：
+ * - 样式完全对齐 AddTagDialog（20dp 圆角 Surface 容器、12dp OutlinedTextField、前置图标、实时字数计数与校验、4 种图标 + 9 种颜色横向滚动单选）
+ * - 智能防重名校验（排除自身当前名称，允许保留原名；改名且与其他已有标签重名时拦截）
+ * - 支持同时编辑/切换图标与颜色（互斥单选）
  */
 @Composable
 fun TagEditDialog(
     initialName: String,
-    initialColorHex: String,
+    initialColorHex: String?,
+    initialIcon: String? = null,
+    allExistingTags: List<TagEntity> = emptyList(),
     title: String = "编辑标签",
-    onConfirm: (newName: String, newColorHex: String) -> Unit,
+    onConfirm: (newName: String, newColorHex: String?, newIcon: String?) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var name by remember { mutableStateOf(initialName) }
-    var selectedColorHex by remember { mutableStateOf(initialColorHex) }
-    var errorText by remember { mutableStateOf<String?>(null) }
+    var tagName by remember { mutableStateOf(initialName) }
+    var selectedIcon by remember { mutableStateOf(initialIcon) }
+    var selectedColor by remember { mutableStateOf(initialColorHex) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(text = title, fontWeight = FontWeight.Bold) },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = {
-                        name = it
-                        if (errorText != null) errorText = null
-                    },
-                    label = { Text("标签名称") },
-                    singleLine = true,
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                )
+    val trimmed = tagName.trim().removePrefix("#").trim()
+    val isBlank = trimmed.isBlank()
+    val isTooLong = trimmed.length > 8
+    val isReserved = trimmed == "收藏" || trimmed == "全部收藏"
+    val existingMatch = remember(trimmed, allExistingTags) {
+        if (trimmed.isEmpty()) null
+        else allExistingTags.find { it.name.equals(trimmed, ignoreCase = true) }
+    }
+    val isDuplicate = existingMatch != null && !existingMatch.name.equals(initialName.trim(), ignoreCase = true)
 
-                if (errorText != null) {
-                    Text(
-                        text = errorText!!,
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(min = 280.dp, max = 560.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 24.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 标题
                 Text(
-                    text = "主题色彩",
-                    style = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    text = title,
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 24.dp)
                 )
-                Spacer(modifier = Modifier.height(8.dp))
 
-                // 颜色选择器
+                // 1. TextField
+                OutlinedTextField(
+                    value = tagName,
+                    onValueChange = { input ->
+                        if (input.length <= 8) {
+                            tagName = input
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                    label = { Text("标签名称") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.Edit,
+                            contentDescription = null
+                        )
+                    },
+                    supportingText = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            if (isReserved) {
+                                Text(
+                                    text = "不能使用系统预留名称“$trimmed”",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else if (isDuplicate) {
+                                Text(
+                                    text = "已存在同名标签",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else {
+                                Text(
+                                    text = "不超过 8 字，不得与其他标签重复",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "${trimmed.length}/8",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    isError = isDuplicate || isTooLong || isReserved,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                )
+
+                // 2. 选择图标或颜色行
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TAG_PRESET_COLORS.forEach { colorHex ->
-                        val isPicked = selectedColorHex.equals(colorHex, ignoreCase = true)
-                        val color = parseTagColor(colorHex)
-                        Box(
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .background(color)
-                                .then(
-                                    if (isPicked) Modifier.border(2.5.dp, MaterialTheme.colorScheme.onSurface, CircleShape)
-                                    else Modifier
-                                )
-                                .clickable { selectedColorHex = colorHex },
-                            contentAlignment = Alignment.Center
+                    val iconOptions = listOf(
+                        "star" to Icons.Outlined.Star,
+                        "person" to Icons.Outlined.Person,
+                        "lightbulb" to Icons.Outlined.Lightbulb,
+                        "question_answer" to Icons.Outlined.QuestionAnswer
+                    )
+                    iconOptions.forEach { (id, vector) ->
+                        val isSelected = selectedIcon == id
+                        Surface(
+                            onClick = {
+                                if (isSelected) {
+                                    selectedIcon = null
+                                } else {
+                                    selectedIcon = id
+                                    selectedColor = null
+                                }
+                            },
+                            shape = CircleShape,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
                         ) {
-                            if (isPicked) {
+                            Box(contentAlignment = Alignment.Center) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(14.dp)
+                                    imageVector = vector,
+                                    contentDescription = id,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    val trimmed = name.trim()
-                    if (trimmed.isBlank()) {
-                        errorText = "名称不能为空"
-                    } else {
-                        onConfirm(trimmed, selectedColorHex)
+
+                    // 颜色实心圆选项
+                    TAG_PRESET_COLORS.forEach { hex ->
+                        val color = parseTagColor(hex)
+                        val isSelected = selectedColor?.equals(hex, ignoreCase = true) == true
+                        Surface(
+                            onClick = {
+                                if (isSelected) {
+                                    selectedColor = null
+                                } else {
+                                    selectedColor = hex
+                                    selectedIcon = null
+                                }
+                            },
+                            shape = CircleShape,
+                            color = color,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            if (isSelected) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color.White, CircleShape)
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
-            ) {
-                Text("保存", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
+
+                // 3. 底部取消与保存按钮
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("取消")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (!isBlank && !isTooLong && !isDuplicate && !isReserved) {
+                                onConfirm(trimmed, selectedColor, selectedIcon)
+                            }
+                        },
+                        enabled = !isBlank && !isTooLong && !isDuplicate && !isReserved
+                    ) {
+                        Text("保存", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
-    )
+    }
 }
 
 /**
- * 标签删除确认对话框
+ * 标签删除确认对话框：
+ * - 遵循 MD3 破坏性操作规范：顶部加入 Hero 警告/删除图标
+ * - 信息层级清晰化：主提示加粗突出，副说明交代解除关联与数据安全性
+ * - 按钮危险级强调：使用红色警示色
  */
 @Composable
 fun TagDeleteConfirmDialog(
@@ -672,12 +801,34 @@ fun TagDeleteConfirmDialog(
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = "删除标签", fontWeight = FontWeight.Bold) },
-        text = {
-            Text(
-                text = "确定要删除标签“$tagName”吗？\n删除后该标签将从所有已标记的章节和试题中解除关联，章节和试题本身不会受到任何影响。",
-                style = MaterialTheme.typography.bodyMedium
+        icon = {
+            Icon(
+                imageVector = Icons.Outlined.Delete,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(24.dp)
             )
+        },
+        title = {
+            Text(
+                text = "删除标签",
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    text = "确定要删除标签“$tagName”吗？",
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Text(
+                    text = "删除后该标签将从所有已标记的章节和试题中解除关联，章节和试题本身不会受到任何影响。",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         },
         confirmButton = {
             TextButton(
@@ -717,7 +868,8 @@ fun AddTagDialog(
 
     val trimmed = tagName.trim().removePrefix("#").trim()
     val isBlank = trimmed.isBlank()
-    val isTooLong = trimmed.length > 10
+    val isTooLong = trimmed.length > 8
+    val isReserved = trimmed == "收藏" || trimmed == "全部收藏"
     val existingMatch = remember(trimmed, allExistingTags) {
         if (trimmed.isEmpty()) null
         else allExistingTags.find { it.name.equals(trimmed, ignoreCase = true) }
@@ -725,216 +877,231 @@ fun AddTagDialog(
     val isDuplicate = existingMatch != null
     val isAlreadyAttached = existingMatch != null && attachedTagIds.contains(existingMatch.id)
 
-    // 实时建议标签 Chips 行：找出尚未附加到本章的标签，支持按输入前缀/子串实时过滤
+    // 建议标签 Chips 行：仅当用户输入内容之后才出现，只出现匹配了的 label（按子串模糊匹配）
     val suggestionTags = remember(trimmed, allExistingTags, attachedTagIds) {
-        val available = allExistingTags.filter { !attachedTagIds.contains(it.id) }
         if (trimmed.isEmpty()) {
-            available
+            emptyList()
         } else {
+            val available = allExistingTags.filter { !attachedTagIds.contains(it.id) }
             available.filter { it.name.contains(trimmed, ignoreCase = true) }
         }
     }
 
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        shape = RoundedCornerShape(20.dp),
-        title = {
-            Text(
-                text = "添加标签",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 20.sp
-                )
-            )
-        },
-        text = {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Surface(
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp,
+            modifier = Modifier
+                .fillMaxWidth()
+                .widthIn(min = 280.dp, max = 560.dp)
+        ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(14.dp)
+                    .padding(top = 24.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // 1. TextField
-                Column {
-                    OutlinedTextField(
-                        value = tagName,
-                        onValueChange = { input ->
-                            if (input.length <= 10) {
-                                tagName = input
-                            }
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        singleLine = true,
-                        placeholder = { Text("输入标签名称（10字以内）") },
-                        supportingText = {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                if (isDuplicate) {
-                                    Text(
-                                        text = if (isAlreadyAttached) "本章已添加该标签" else "已存在该标签，可点下方建议添加",
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall
-                                    )
-                                } else {
-                                    Text(
-                                        text = "不得与已有标签重复",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Text(
-                                    text = "${trimmed.length}/10",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        },
-                        isError = isDuplicate || isTooLong,
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
+                // 标题
+                Text(
+                    text = "添加标签",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp
+                    ),
+                    modifier = Modifier.padding(horizontal = 24.dp)
+                )
 
-                // 2. 可能存在的 chips 建议行
-                if (suggestionTags.isNotEmpty()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(
-                            text = "已有标签建议（点击直接添加）：",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        )
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .horizontalScroll(rememberScrollState()),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            suggestionTags.forEach { tag ->
-                                TagChip(
-                                    name = tag.name,
-                                    colorHex = tag.colorHex,
-                                    icon = tag.icon,
-                                    onClick = {
-                                        onSelectExistingTag(tag)
-                                        onDismissRequest()
-                                    }
-                                )
-                            }
+                // 1. TextField（MD3 Outlined 样式，灰色 Leading Icon，Primary 主题色聚焦）
+                OutlinedTextField(
+                    value = tagName,
+                    onValueChange = { input ->
+                        if (input.length <= 8) {
+                            tagName = input
                         }
-                    }
-                }
-
-                // 3. 选择图标或颜色行
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        text = "选择代表图标或颜色（可选）：",
-                        style = MaterialTheme.typography.labelSmall.copy(
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    singleLine = true,
+                    textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                    label = { Text("标签名称") },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Outlined.NewLabel,
+                            contentDescription = null
                         )
+                    },
+                    supportingText = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            if (isReserved) {
+                                Text(
+                                    text = "不能使用系统预留名称“$trimmed”",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else if (isDuplicate) {
+                                Text(
+                                    text = if (isAlreadyAttached) "本章已添加该标签" else "已存在该标签，可点下方建议添加",
+                                    color = MaterialTheme.colorScheme.error,
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            } else {
+                                Text(
+                                    text = "不超过 8 字，不得与已有标签重复",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(
+                                text = "${trimmed.length}/8",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    },
+                    isError = isDuplicate || isTooLong || isReserved,
+                    shape = RoundedCornerShape(12.dp),
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                        focusedLabelColor = MaterialTheme.colorScheme.primary,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                )
+
+                // 2. 建议 Chips 行（仅当用户输入内容之后且有匹配建议时出现；滑动边缘贴齐 dialog 边缘，滑动边界与 24dp 内容对齐）
+                if (suggestionTags.isNotEmpty()) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            .horizontalScroll(rememberScrollState())
+                            .padding(horizontal = 24.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // 4 种图标：星星 Star, 人物 Person, 概念灯泡 Lightbulb, 对话 QuestionAnswer
-                        val iconOptions = listOf(
-                            "star" to Icons.Outlined.Star,
-                            "person" to Icons.Outlined.Person,
-                            "lightbulb" to Icons.Outlined.Lightbulb,
-                            "question_answer" to Icons.Outlined.QuestionAnswer
-                        )
-                        iconOptions.forEach { (id, vector) ->
-                            val isSelected = selectedIcon == id
-                            Surface(
+                        suggestionTags.forEach { tag ->
+                            TagChip(
+                                name = tag.name,
+                                colorHex = tag.colorHex,
+                                icon = tag.icon,
                                 onClick = {
-                                    if (isSelected) {
-                                        selectedIcon = null
-                                    } else {
-                                        selectedIcon = id
-                                        selectedColor = null
-                                    }
-                                },
-                                shape = CircleShape,
-                                color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
-                                border = if (isSelected) BorderStroke(2.dp, MaterialTheme.colorScheme.primary) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-                                modifier = Modifier.size(34.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        imageVector = vector,
-                                        contentDescription = id,
-                                        modifier = Modifier.size(17.dp),
-                                        tint = if (isSelected) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurface
-                                    )
+                                    onSelectExistingTag(tag)
+                                    onDismissRequest()
                                 }
+                            )
+                        }
+                    }
+                }
+
+                // 3. 选择图标或颜色行（滑动边缘贴齐 dialog 边缘，滑动边界与 24dp 内容对齐）
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // 4 种图标：星星 Star, 人物 Person, 概念灯泡 Lightbulb, 对话 QuestionAnswer
+                    val iconOptions = listOf(
+                        "star" to Icons.Outlined.Star,
+                        "person" to Icons.Outlined.Person,
+                        "lightbulb" to Icons.Outlined.Lightbulb,
+                        "question_answer" to Icons.Outlined.QuestionAnswer
+                    )
+                    iconOptions.forEach { (id, vector) ->
+                        val isSelected = selectedIcon == id
+                        Surface(
+                            onClick = {
+                                if (isSelected) {
+                                    selectedIcon = null
+                                } else {
+                                    selectedIcon = id
+                                    selectedColor = null
+                                }
+                            },
+                            shape = CircleShape,
+                            color = if (isSelected) {
+                                MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f)
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainerHigh
+                            },
+                            border = if (isSelected) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Icon(
+                                    imageVector = vector,
+                                    contentDescription = id,
+                                    modifier = Modifier.size(16.dp),
+                                    tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
                             }
                         }
+                    }
 
-                        // 分隔线
-                        Box(
-                            modifier = Modifier
-                                .width(1.dp)
-                                .height(22.dp)
-                                .background(MaterialTheme.colorScheme.outlineVariant)
-                        )
-
-                        // 颜色实心圆选项
-                        TAG_PRESET_COLORS.forEach { hex ->
-                            val color = parseTagColor(hex)
-                            val isSelected = selectedColor == hex
-                            Surface(
-                                onClick = {
-                                    if (isSelected) {
-                                        selectedColor = null
-                                    } else {
-                                        selectedColor = hex
-                                        selectedIcon = null
-                                    }
-                                },
-                                shape = CircleShape,
-                                color = color,
-                                border = if (isSelected) BorderStroke(2.5.dp, MaterialTheme.colorScheme.onSurface) else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
-                                modifier = Modifier.size(26.dp)
-                            ) {
+                    // 颜色实心圆选项
+                    TAG_PRESET_COLORS.forEach { hex ->
+                        val color = parseTagColor(hex)
+                        val isSelected = selectedColor == hex
+                        Surface(
+                            onClick = {
                                 if (isSelected) {
-                                    Box(contentAlignment = Alignment.Center) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(7.dp)
-                                                .background(Color.White, CircleShape)
-                                        )
-                                    }
+                                    selectedColor = null
+                                } else {
+                                    selectedColor = hex
+                                    selectedIcon = null
+                                }
+                            },
+                            shape = CircleShape,
+                            color = color,
+                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            if (isSelected) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .background(Color.White, CircleShape)
+                                    )
                                 }
                             }
                         }
                     }
                 }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    if (!isBlank && !isTooLong && !isDuplicate) {
-                        onCreateNewTag(trimmed, selectedColor, selectedIcon)
-                        onDismissRequest()
+
+                // 4. 底部取消与确认按钮
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TextButton(onClick = onDismissRequest) {
+                        Text("取消")
                     }
-                },
-                enabled = !isBlank && !isTooLong && !isDuplicate
-            ) {
-                Text("确认", fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text("取消")
+                    Spacer(modifier = Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            if (!isBlank && !isTooLong && !isDuplicate && !isReserved) {
+                                onCreateNewTag(trimmed, selectedColor, selectedIcon)
+                                onDismissRequest()
+                            }
+                        },
+                        enabled = !isBlank && !isTooLong && !isDuplicate && !isReserved
+                    ) {
+                        Text("确认", fontWeight = FontWeight.Bold)
+                    }
+                }
             }
         }
-    )
+    }
 }
 

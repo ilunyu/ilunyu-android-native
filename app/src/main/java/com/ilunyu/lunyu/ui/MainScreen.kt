@@ -90,6 +90,7 @@ fun MainScreen(
     val studyScrollIndex by viewModel.studyScrollIndex.collectAsState()
     val studyScrollOffset by viewModel.studyScrollOffset.collectAsState()
 
+    val favoritesTagId by viewModel.favoritesTagId.collectAsState()
     val favoritesTab by viewModel.favoritesTab.collectAsState()
     val favoritesSortMode by viewModel.favoritesSortMode.collectAsState()
     val favoritesYears by viewModel.favoritesYears.collectAsState()
@@ -202,6 +203,9 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = currentTab == 2,
                         onClick = {
+                            if (currentTab == 2 && favoritesTagId != null) {
+                                viewModel.setFavoritesTagId(null)
+                            }
                             isNavigatingBack = false
                             destinationStack = listOf(ScreenDestination.Tab(2))
                         },
@@ -396,10 +400,18 @@ fun MainScreen(
                                 allPians = library?.pians ?: emptyList(),
                                 allExercises = exercises,
                                 allTags = tagsWithCounts,
-                                onCreateTag = { name, color -> viewModel.createTag(name, color) },
-                                onUpdateTag = { tagId, name, color -> viewModel.updateTag(tagId, name, color) },
+                                selectedTagId = favoritesTagId,
+                                onSelectTag = { viewModel.setFavoritesTagId(it) },
+                                getTagChapterIds = { viewModel.getChapterIdsForTag(it) },
+                                getTagExerciseIds = { viewModel.getExerciseIdsForTag(it) },
+                                onCreateTag = { name, color, onCreated ->
+                                    viewModel.createTag(name, color) { result ->
+                                        result.getOrNull()?.let(onCreated)
+                                    }
+                                },
+                                onUpdateTag = { tagId, name, color, icon -> viewModel.updateTag(tagId, name, color, icon) },
                                 onDeleteTag = { tagId -> viewModel.deleteTag(tagId) },
-                                onNavigateToTag = { tagId -> navigateTo(ScreenDestination.TagDetail(tagId)) },
+                                onNavigateToTag = { tagId -> viewModel.setFavoritesTagId(tagId) },
                                 selectedTab = favoritesTab,
                                 onTabChange = { viewModel.setFavoritesTab(it) },
                                 sortMode = favoritesSortMode,
@@ -469,7 +481,11 @@ fun MainScreen(
                                 allTags = tagsWithCounts,
                                 onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "CHAPTER", chapter.id) },
                                 onCreateTag = { name, color, icon -> viewModel.createTagAndAttach(name, color, icon, "CHAPTER", chapter.id) },
-                                onNavigateToTag = { tagId -> navigateTo(ScreenDestination.TagDetail(tagId)) },
+                                onNavigateToTag = { tagId ->
+                                    viewModel.setFavoritesTagId(tagId)
+                                    viewModel.setFavoritesTab(0)
+                                    navigateTo(ScreenDestination.Tab(2))
+                                },
                                 onReorderTags = { orderedTagIds -> viewModel.reorderItemTags("CHAPTER", chapter.id, orderedTagIds) },
                                 scrollIndex = scrollPair?.first ?: 0,
                                 scrollOffset = scrollPair?.second ?: 0,
@@ -512,7 +528,11 @@ fun MainScreen(
                                 allTags = tagsWithCounts,
                                 onToggleTag = { tagId -> viewModel.toggleItemTag(tagId, "EXERCISE", exercise.id) },
                                 onCreateTag = { name, color, icon -> viewModel.createTagAndAttach(name, color, icon, "EXERCISE", exercise.id) },
-                                onNavigateToTag = { tagId -> navigateTo(ScreenDestination.TagDetail(tagId)) },
+                                onNavigateToTag = { tagId ->
+                                    viewModel.setFavoritesTagId(tagId)
+                                    viewModel.setFavoritesTab(1)
+                                    navigateTo(ScreenDestination.Tab(2))
+                                },
                                 onReorderTags = { orderedTagIds -> viewModel.reorderItemTags("EXERCISE", exercise.id, orderedTagIds) },
                                 scrollIndex = scrollPair?.first ?: 0,
                                 scrollOffset = scrollPair?.second ?: 0,

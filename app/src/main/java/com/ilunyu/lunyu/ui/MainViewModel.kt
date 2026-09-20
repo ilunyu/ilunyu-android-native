@@ -71,6 +71,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun deleteTag(tagId: String) {
         viewModelScope.launch {
+            if (_favoritesTagId.value == tagId) {
+                _favoritesTagId.value = null
+            }
             tagRepo.deleteTag(tagId)
         }
     }
@@ -152,6 +155,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val studyScrollOffset: StateFlow<Int> = _studyScrollOffset.asStateFlow()
 
     // 3. FavoritesScreen state
+    private val _favoritesTagId = MutableStateFlow<String?>(null)
+    val favoritesTagId: StateFlow<String?> = _favoritesTagId.asStateFlow()
     private val _favoritesTab = MutableStateFlow(0)
     val favoritesTab: StateFlow<Int> = _favoritesTab.asStateFlow()
     private val _favoritesSortMode = MutableStateFlow(FavoritesSortMode.DEFAULT)
@@ -304,6 +309,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     // FavoritesScreen
+    fun setFavoritesTagId(tagId: String?) {
+        _favoritesTagId.value = tagId
+    }
+
     fun setFavoritesTab(tab: Int) {
         _favoritesTab.value = tab
     }
