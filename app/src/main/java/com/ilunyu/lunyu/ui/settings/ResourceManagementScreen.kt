@@ -338,6 +338,18 @@ fun ResourceManagementScreen(
                     ResourceSectionHeader("译注版本")
                 }
 
+                if (installedEditions.isEmpty()) {
+                    item {
+                        Text(
+                            text = "暂未安装任何译注版本。",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 12.dp),
+                        )
+                    }
+                }
+
                 // 已安装译注列表
                 items(
                     count = installedEditions.size,
@@ -487,6 +499,18 @@ fun ResourceManagementScreen(
                 // 3. 试题库小标题
                 item {
                     ResourceSectionHeader("试题库")
+                }
+
+                if (installedExercises.isEmpty()) {
+                    item {
+                        Text(
+                            text = "暂未安装任何试题库。",
+                            style = MaterialTheme.typography.bodyMedium.copy(
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            ),
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 12.dp),
+                        )
+                    }
                 }
 
                 // 已安装试题库列表
