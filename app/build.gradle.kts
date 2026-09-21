@@ -46,6 +46,20 @@ android {
     buildFeatures {
         compose = true
     }
+
+}
+
+// Content packages are supplied by the resource manager. The app keeps only
+// the UI assets it needs to open before a user adds a resource URL.
+listOf("debug", "release").forEach { variant ->
+    val taskName = "merge${variant.replaceFirstChar { it.uppercase() }}Assets"
+    tasks.matching { it.name == taskName }.configureEach {
+        doLast {
+            project.delete(
+                layout.buildDirectory.dir("intermediates/assets/$variant/$taskName/content"),
+            )
+        }
+    }
 }
 
 dependencies {

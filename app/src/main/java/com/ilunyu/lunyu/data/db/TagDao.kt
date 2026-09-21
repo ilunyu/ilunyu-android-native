@@ -58,6 +58,9 @@ interface TagDao {
     @Query("SELECT target_id FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType ORDER BY created_at DESC")
     fun getTargetIdsForTagFlow(tagId: String, targetType: String): Flow<List<String>>
 
+    @Query("UPDATE OR IGNORE item_tags SET target_id = :newTargetId WHERE target_type = 'EXERCISE' AND target_id = :oldTargetId")
+    suspend fun migrateExerciseId(oldTargetId: String, newTargetId: String): Int
+
     @Query("SELECT COUNT(*) > 0 FROM item_tags WHERE tag_id = :tagId AND target_type = :targetType AND target_id = :targetId")
     suspend fun hasItemTag(tagId: String, targetType: String, targetId: String): Boolean
 

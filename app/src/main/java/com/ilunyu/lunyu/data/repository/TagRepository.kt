@@ -263,4 +263,13 @@ class TagRepository(private val tagDao: TagDao) {
             tagDao.insertItemTag(ItemTagCrossRef(tagId = tagId, targetType = targetType, targetId = targetId, sortOrder = order++))
         }
     }
+
+    /**
+     * 迁移旧版本试题规范 ID
+     */
+    suspend fun migrateLegacyExerciseIds() = withContext(Dispatchers.IO) {
+        UserPreferencesRepository.LEGACY_EXERCISE_ID_MAP.forEach { (oldId, newId) ->
+            tagDao.migrateExerciseId(oldId, newId)
+        }
+    }
 }

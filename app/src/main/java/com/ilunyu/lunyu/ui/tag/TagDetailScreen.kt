@@ -98,7 +98,7 @@ fun TagDetailScreen(
     val exerciseIds by viewModel.getExerciseIdsForTag(tagId).collectAsState(emptyList())
 
     val library by viewModel.library.collectAsState()
-    val allExercises by viewModel.exercises.collectAsState()
+    val allExercises by viewModel.allInstalledExercises.collectAsState()
     val favoriteChapters by viewModel.favoriteChapters.collectAsState()
     val favoriteExercises by viewModel.favoriteExercises.collectAsState()
 

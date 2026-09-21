@@ -1,5 +1,6 @@
 package com.ilunyu.lunyu.data.model
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -29,6 +30,7 @@ data class AnalectsLibrary(
 
 @Serializable
 data class AnalectsSource(
+    @SerialName("id")
     val key: String = "",
     val name: String = "",
     val shortName: String = "",
@@ -76,8 +78,8 @@ data class Chapter(
     val id: String,
     val number: Int,
     val displayId: String,
-    val text: String,
-    val plainText: String,
+    val text: String = "",
+    val plainText: String = "",
     val translation: String = "",
     val annotations: List<Annotation> = emptyList(),
     val comment: String = "",
@@ -91,4 +93,3 @@ data class Annotation(
     val label: String,
     val text: String
 )
-

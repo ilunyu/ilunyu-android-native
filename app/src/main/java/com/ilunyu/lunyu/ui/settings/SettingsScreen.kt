@@ -73,6 +73,7 @@ fun SettingsScreen(
     onFontPreferenceChanged: (AppFontPreference) -> Unit,
     defaultAnswerExpanded: Boolean = true,
     onDefaultAnswerExpandedChanged: (Boolean) -> Unit = {},
+    onOpenResourceManagement: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -244,15 +245,25 @@ fun SettingsScreen(
                 )
             }
 
-            // 学习小标题
+            // 内容小标题（整合原“学习”与“资源”）
             item {
                 Text(
-                    text = "学习",
+                    text = "内容",
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
                     modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
+                )
+            }
+
+            item {
+                SettingListItem(
+                    icon = Icons.Outlined.AutoStories,
+                    title = "资源管理",
+                    subtitle = "获取或维护译注和学年题库资源",
+                    trailingIcon = Icons.AutoMirrored.Outlined.ArrowForward,
+                    onClick = onOpenResourceManagement
                 )
             }
 
@@ -288,12 +299,12 @@ fun SettingsScreen(
                 )
             }
 
-            // 3. 更多资源
+            // 开源仓库（引导至 github.com/ilunyu 主页）
             item {
                 SettingListItem(
-                    icon = Icons.Outlined.AutoStories,
-                    title = "更多资源",
-                    subtitle = "在 ilunyu 主页获取更多试题与版本",
+                    icon = Icons.Outlined.Code,
+                    title = "开源仓库",
+                    subtitle = "github.com/ilunyu",
                     trailingIcon = Icons.AutoMirrored.Outlined.OpenInNew,
                     onClick = {
                         openUrl(context, "https://github.com/ilunyu")
@@ -301,20 +312,7 @@ fun SettingsScreen(
                 )
             }
 
-            // 4. 开源仓库
-            item {
-                SettingListItem(
-                    icon = Icons.Outlined.Code,
-                    title = "开源仓库",
-                    subtitle = "github.com/ilunyu/ilunyu",
-                    trailingIcon = Icons.AutoMirrored.Outlined.OpenInNew,
-                    onClick = {
-                        openUrl(context, "https://github.com/ilunyu/ilunyu")
-                    }
-                )
-            }
-
-            // 5. 意见反馈
+            // 意见反馈
             item {
                 SettingListItem(
                     icon = Icons.Outlined.Mail,

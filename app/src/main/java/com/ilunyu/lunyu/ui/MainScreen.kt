@@ -52,6 +52,7 @@ import com.ilunyu.lunyu.ui.reading.ChapterScreen
 import com.ilunyu.lunyu.ui.reading.ReadingScreen
 import com.ilunyu.lunyu.ui.search.SearchScreen
 import com.ilunyu.lunyu.ui.settings.SettingsScreen
+import com.ilunyu.lunyu.ui.settings.ResourceManagementScreen
 import com.ilunyu.lunyu.ui.study.ExerciseDetailScreen
 import com.ilunyu.lunyu.ui.study.StudyScreen
 import com.ilunyu.lunyu.ui.tag.TagDetailScreen
@@ -63,6 +64,7 @@ sealed interface ScreenDestination {
     data class ExerciseDetail(val exerciseId: String) : ScreenDestination
     data class TagDetail(val tagId: String) : ScreenDestination
     data class Search(val initialTab: Int = 0) : ScreenDestination
+    data object ResourceManagement : ScreenDestination
 }
 
 @Composable
@@ -77,6 +79,7 @@ fun MainScreen(
     val defaultAnswerExpanded by viewModel.defaultAnswerExpanded.collectAsState()
     val library by viewModel.library.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
+    val allInstalledExercises by viewModel.allInstalledExercises.collectAsState()
 
     val activePianSlug by viewModel.activePianSlug.collectAsState()
     val pianScrollMap by viewModel.pianScrollMap.collectAsState()
@@ -115,6 +118,7 @@ fun MainScreen(
         is ScreenDestination.ExerciseDetail -> 1
         is ScreenDestination.TagDetail -> 2
         is ScreenDestination.Search -> -1
+        ScreenDestination.ResourceManagement -> 3
     }
 
     fun navigateTo(dest: ScreenDestination) {
@@ -398,7 +402,7 @@ fun MainScreen(
                                 favoriteChapterIds = favoriteChapters,
                                 favoriteExerciseIds = favoriteExercises,
                                 allPians = library?.pians ?: emptyList(),
-                                allExercises = exercises,
+                                allExercises = allInstalledExercises,
                                 allTags = tagsWithCounts,
                                 selectedTagId = favoritesTagId,
                                 onSelectTag = { viewModel.setFavoritesTagId(it) },
@@ -451,7 +455,8 @@ fun MainScreen(
                                 onThemeModeChanged = { viewModel.setThemeMode(it) },
                                 onFontPreferenceChanged = { viewModel.setFontPreference(it) },
                                 defaultAnswerExpanded = defaultAnswerExpanded,
-                                onDefaultAnswerExpandedChanged = { viewModel.setDefaultAnswerExpanded(it) }
+                                onDefaultAnswerExpandedChanged = { viewModel.setDefaultAnswerExpanded(it) },
+                                onOpenResourceManagement = { navigateTo(ScreenDestination.ResourceManagement) }
                             )
                         }
                     }
@@ -615,6 +620,33 @@ fun MainScreen(
                                 viewModel.clearSearch()
                                 navigateBack()
                             }
+                        )
+                    }
+                    ScreenDestination.ResourceManagement -> {
+                        val snapshot by viewModel.contentSnapshot.collectAsState()
+                        val installedResources by viewModel.installedResources.collectAsState()
+                        val registry by viewModel.resourceRegistry.collectAsState()
+                        val operationState by viewModel.resourceOperationState.collectAsState()
+                        ResourceManagementScreen(
+                            snapshot = snapshot,
+                            installedResources = installedResources,
+                            registry = registry,
+                            operationState = operationState,
+                            onAddUrl = { viewModel.addResourceFromUrl(it) },
+                            onRefresh = { viewModel.refreshResourceRegistry() },
+                            onDownload = { viewModel.downloadResource(it) },
+                            onSelectEdition = { resource ->
+                                viewModel.selectResourceEdition(
+                                    resource.packageId,
+                                    resource.versionCode,
+                                    resource.locationType,
+                                )
+                            },
+                            onSetExerciseEnabled = { packageId, enabled ->
+                                viewModel.setExerciseResourceEnabled(packageId, enabled)
+                            },
+                            onDeleteResource = { resource -> viewModel.deleteResource(resource) },
+                            onBack = { navigateBack() },
                         )
                     }
                 }

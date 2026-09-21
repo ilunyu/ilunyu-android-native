@@ -13,6 +13,11 @@ import com.ilunyu.lunyu.data.model.Pian
 import com.ilunyu.lunyu.data.db.TagEntity
 import com.ilunyu.lunyu.data.db.TagWithCounts
 import com.ilunyu.lunyu.data.db.TargetType
+import com.ilunyu.lunyu.data.resource.ContentSnapshot
+import com.ilunyu.lunyu.data.resource.ResourceOperationState
+import com.ilunyu.lunyu.data.db.InstalledResourceEntity
+import com.ilunyu.lunyu.data.resource.ResourceRegistry
+import com.ilunyu.lunyu.data.resource.OFFICIAL_RESOURCE_REGISTRY_URL
 import com.ilunyu.lunyu.ui.favorites.FavoritesSortMode
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +34,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val analectsRepo = app.analectsRepository
     private val exerciseRepo = app.exerciseRepository
     private val tagRepo = app.tagRepository
+    private val resourceRepo = app.resourceRepository
+    private val resourceManager = app.resourceManager
+
+    val contentSnapshot: StateFlow<ContentSnapshot> = resourceRepo.contentSnapshot
+    val installedResources = resourceRepo.installedResources
+    val resourceOperationState: StateFlow<ResourceOperationState> = resourceManager.operationState
+    val resourceRegistry: StateFlow<ResourceRegistry?> = resourceManager.registry
 
     val tagsWithCounts: StateFlow<List<TagWithCounts>> = tagRepo.allTagsWithCountsFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -111,6 +123,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _exercises = MutableStateFlow<List<Exercise>>(emptyList())
     val exercises: StateFlow<List<Exercise>> = _exercises.asStateFlow()
 
+    private val _allInstalledExercises = MutableStateFlow<List<Exercise>>(emptyList())
+    val allInstalledExercises: StateFlow<List<Exercise>> = _allInstalledExercises.asStateFlow()
+
     private val _searchExercises = MutableStateFlow<List<Exercise>>(emptyList())
     val searchExercises: StateFlow<List<Exercise>> = _searchExercises.asStateFlow()
 
@@ -186,14 +201,38 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         viewModelScope.launch {
-            _library.value = analectsRepo.getLibrary()
+            contentSnapshot.collect {
+                _library.value = analectsRepo.getLibrary()
+                _exercises.value = exerciseRepo.getExerciseList()
+                _searchExercises.value = exerciseRepo.getSearchExercises()
+                _allInstalledExercises.value = exerciseRepo.getAllInstalledExercises()
+            }
         }
-        viewModelScope.launch {
-            _exercises.value = exerciseRepo.getExerciseList()
-        }
-        viewModelScope.launch {
-            _searchExercises.value = exerciseRepo.getSearchExercises()
-        }
+    }
+
+    fun addResourceFromUrl(url: String) {
+        viewModelScope.launch { resourceManager.downloadAndInstallFromUrl(url) }
+    }
+
+    suspend fun refreshResourceRegistry(): Result<ResourceRegistry> {
+        return resourceManager.refreshRegistry(OFFICIAL_RESOURCE_REGISTRY_URL)
+    }
+
+    fun downloadResource(packageId: String) {
+        val item = resourceRegistry.value?.packages?.find { it.packageId == packageId } ?: return
+        viewModelScope.launch { resourceManager.downloadAndInstall(item) }
+    }
+
+    fun selectResourceEdition(packageId: String, versionCode: Int, locationType: String) {
+        viewModelScope.launch { resourceRepo.selectEdition(packageId, versionCode, locationType) }
+    }
+
+    fun setExerciseResourceEnabled(packageId: String, enabled: Boolean) {
+        viewModelScope.launch { resourceRepo.setExerciseEnabled(packageId, enabled) }
+    }
+
+    fun deleteResource(resource: InstalledResourceEntity) {
+        viewModelScope.launch { resourceManager.deleteDownloadedResource(resource) }
     }
 
     fun setDefaultAnswerExpanded(expanded: Boolean) {
@@ -227,7 +266,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     suspend fun getChapterDetail(pianSlug: String, chapterNumber: Int): Pair<Pian, Chapter>? {
-        return analectsRepo.getChapter(pianSlug, chapterNumber)
+        val result = analectsRepo.getChapter(pianSlug, chapterNumber) ?: return null
+        val relatedQuestions = exerciseRepo.getRelatedQuestions(result.second.id)
+        return result.first to result.second.copy(relatedQuestions = relatedQuestions)
     }
 
     suspend fun getChapterById(chapterId: String): Pair<Pian, Chapter>? {
@@ -363,4 +404,3 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 }
-

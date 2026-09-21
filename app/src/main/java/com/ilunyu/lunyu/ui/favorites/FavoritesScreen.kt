@@ -265,6 +265,19 @@ fun FavoritesScreen(
 
     val scrollState = rememberLunyuTopBarScrollState()
 
+    val toggleSortMode: () -> Unit = {
+        val nextMode = when (sortMode) {
+            FavoritesSortMode.DEFAULT -> FavoritesSortMode.NEWEST_FIRST
+            FavoritesSortMode.NEWEST_FIRST -> FavoritesSortMode.OLDEST_FIRST
+            FavoritesSortMode.OLDEST_FIRST -> FavoritesSortMode.DEFAULT
+        }
+        onUpdateSortMode(nextMode)
+        coroutineScope.launch {
+            chapterListState.scrollToItem(0, 0)
+            exerciseListState.scrollToItem(0, 0)
+        }
+    }
+
     LunyuCollapsibleTabLayout(
         modifier = modifier,
         scrollState = scrollState,
@@ -570,34 +583,6 @@ fun FavoritesScreen(
                             }
                         }
                     }
-                    // 排序按钮
-                    IconButton(
-                        onClick = {
-                            val nextMode = when (sortMode) {
-                                FavoritesSortMode.DEFAULT -> FavoritesSortMode.NEWEST_FIRST
-                                FavoritesSortMode.NEWEST_FIRST -> FavoritesSortMode.OLDEST_FIRST
-                                FavoritesSortMode.OLDEST_FIRST -> FavoritesSortMode.DEFAULT
-                            }
-                            onUpdateSortMode(nextMode)
-                            coroutineScope.launch {
-                                chapterListState.scrollToItem(0, 0)
-                                exerciseListState.scrollToItem(0, 0)
-                            }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = when (sortMode) {
-                                FavoritesSortMode.DEFAULT -> Icons.AutoMirrored.Filled.Sort
-                                FavoritesSortMode.NEWEST_FIRST -> Icons.Default.ArrowDownward
-                                FavoritesSortMode.OLDEST_FIRST -> Icons.Default.ArrowUpward
-                            },
-                            contentDescription = when (sortMode) {
-                                FavoritesSortMode.DEFAULT -> "默认排序（点击切换为最近收藏）"
-                                FavoritesSortMode.NEWEST_FIRST -> "最近收藏（点击切换为最早收藏）"
-                                FavoritesSortMode.OLDEST_FIRST -> "最早收藏（点击切换为默认排序）"
-                            }
-                        )
-                    }
                     // 搜索按钮（最右侧）
                     IconButton(onClick = onNavigateToSearch) {
                         Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
@@ -633,14 +618,25 @@ fun FavoritesScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item {
-                                Text(
-                                    text = "共 ${displayedChapters.size} 章",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "共 ${displayedChapters.size} 章",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                    FavoritesSortAction(
+                                        sortMode = sortMode,
+                                        onToggleSortMode = toggleSortMode
+                                    )
+                                }
                             }
 
                             itemsIndexed(
@@ -678,16 +674,27 @@ fun FavoritesScreen(
                             state = exerciseListState,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
+                            // 1. 统计数据行与排序操作（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
                             item(key = "count_header") {
-                                Text(
-                                    text = countText,
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 0.dp)
-                                )
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 0.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = countText,
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    )
+                                    FavoritesSortAction(
+                                        sortMode = sortMode,
+                                        onToggleSortMode = toggleSortMode
+                                    )
+                                }
                             }
 
                             // 2. 筛选器行：挪到“共 xx 题”下方，依次为学年、地区、年级、类别
@@ -786,3 +793,47 @@ fun FavoritesScreen(
         )
     }
 }
+
+@Composable
+private fun FavoritesSortAction(
+    sortMode: FavoritesSortMode,
+    onToggleSortMode: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val sortLabel = when (sortMode) {
+        FavoritesSortMode.DEFAULT -> "默认排序"
+        FavoritesSortMode.NEWEST_FIRST -> "最近收藏"
+        FavoritesSortMode.OLDEST_FIRST -> "最早收藏"
+    }
+    val sortIcon = when (sortMode) {
+        FavoritesSortMode.DEFAULT -> Icons.AutoMirrored.Filled.Sort
+        FavoritesSortMode.NEWEST_FIRST -> Icons.Default.ArrowDownward
+        FavoritesSortMode.OLDEST_FIRST -> Icons.Default.ArrowUpward
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = modifier
+    ) {
+        Text(
+            text = sortLabel,
+            style = MaterialTheme.typography.titleSmall.copy(
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        IconButton(
+            onClick = onToggleSortMode,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Icon(
+                imageVector = sortIcon,
+                contentDescription = "切换排序方式（当前：$sortLabel）",
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+

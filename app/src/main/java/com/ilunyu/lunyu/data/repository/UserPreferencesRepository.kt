@@ -38,7 +38,41 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     val favoriteExercisesFlow: Flow<Set<String>> = context.dataStore.data.map { preferences ->
-        preferences[PreferencesKeys.FAVORITE_EXERCISES] ?: emptySet()
+        val raw = preferences[PreferencesKeys.FAVORITE_EXERCISES] ?: emptySet()
+        raw.map { migrateExerciseId(it) }.toSet()
+    }
+
+    companion object {
+        val LEGACY_EXERCISE_ID_MAP = mapOf(
+            "202301-cpgsem" to "202301-cpgsqm",
+            "202301-cygsem" to "202301-cygsqm",
+            "202301-dxgsem" to "202212-dxgsqm",
+            "202301-fsgsem" to "202301-fsgsqm",
+            "202301-ftgsem" to "202301-ftgsqm",
+            "202301-hdgsem" to "202301-hdgsqm",
+            "202301-sjsgsem" to "202301-sjsgsqm",
+            "202505-dcem" to "202505-dcgsem",
+            "202511-cygsq" to "202511-cygsqz",
+            "202604-cpym" to "202604-cpgsym",
+            "202604-dcym" to "202604-dcgsym",
+            "202604-fsym" to "202604-fsgsym",
+            "202604-ftym" to "202604-ftgsym",
+            "202604-mtgym" to "202604-mtggsym",
+            "202604-pgym" to "202604-pggsym",
+            "202604-sjsym" to "202604-sjsgsym",
+        )
+
+        fun migrateExerciseId(id: String): String = LEGACY_EXERCISE_ID_MAP[id] ?: id
+    }
+
+    suspend fun migrateLegacyExerciseIds() {
+        context.dataStore.edit { preferences ->
+            val raw = preferences[PreferencesKeys.FAVORITE_EXERCISES] ?: return@edit
+            val migrated = raw.map { migrateExerciseId(it) }.toSet()
+            if (migrated != raw) {
+                preferences[PreferencesKeys.FAVORITE_EXERCISES] = migrated
+            }
+        }
     }
 
     val defaultAnswerExpandedFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
@@ -76,12 +110,15 @@ class UserPreferencesRepository(private val context: Context) {
     }
 
     suspend fun toggleExerciseFavorite(exerciseId: String) {
+        val canonicalId = migrateExerciseId(exerciseId)
         context.dataStore.edit { preferences ->
-            val current = preferences[PreferencesKeys.FAVORITE_EXERCISES]?.toMutableSet() ?: mutableSetOf()
-            if (current.contains(exerciseId)) {
-                current.remove(exerciseId)
+            val current = preferences[PreferencesKeys.FAVORITE_EXERCISES]
+                ?.map { migrateExerciseId(it) }
+                ?.toMutableSet() ?: mutableSetOf()
+            if (current.contains(canonicalId)) {
+                current.remove(canonicalId)
             } else {
-                current.add(exerciseId)
+                current.add(canonicalId)
             }
             preferences[PreferencesKeys.FAVORITE_EXERCISES] = current
         }

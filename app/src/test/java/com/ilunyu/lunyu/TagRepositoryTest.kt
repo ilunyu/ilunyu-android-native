@@ -91,6 +91,22 @@ class FakeTagDao : TagDao {
         }
     }
 
+    override suspend fun migrateExerciseId(oldTargetId: String, newTargetId: String): Int {
+        var count = 0
+        val updated = itemTags.map { item ->
+            if (item.targetType == "EXERCISE" && item.targetId == oldTargetId) {
+                count++
+                item.copy(targetId = newTargetId)
+            } else {
+                item
+            }
+        }
+        itemTags.clear()
+        itemTags.addAll(updated)
+        if (count > 0) emit()
+        return count
+    }
+
     override suspend fun hasItemTag(tagId: String, targetType: String, targetId: String): Boolean {
         return itemTags.any { it.tagId == tagId && it.targetType == targetType && it.targetId == targetId }
     }
