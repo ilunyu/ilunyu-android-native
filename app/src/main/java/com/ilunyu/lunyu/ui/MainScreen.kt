@@ -625,7 +625,7 @@ fun MainScreen(
                                             snackbarHostState.currentSnackbarData?.dismiss()
                                             val result = snackbarHostState.showSnackbar(
                                                 message = message,
-                                                actionLabel = "资源管理",
+                                                actionLabel = "前往资源管理",
                                                 duration = SnackbarDuration.Short
                                             )
                                             if (result == SnackbarResult.ActionPerformed) {
