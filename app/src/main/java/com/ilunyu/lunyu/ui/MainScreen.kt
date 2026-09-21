@@ -22,15 +22,24 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.BookmarkBorder
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -42,6 +51,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ilunyu.lunyu.data.model.Chapter
@@ -78,6 +88,7 @@ fun MainScreen(
     val favoriteExercises by viewModel.favoriteExercises.collectAsState()
     val defaultAnswerExpanded by viewModel.defaultAnswerExpanded.collectAsState()
     val library by viewModel.library.collectAsState()
+    val contentSnapshot by viewModel.contentSnapshot.collectAsState()
     val exercises by viewModel.exercises.collectAsState()
     val allInstalledExercises by viewModel.allInstalledExercises.collectAsState()
 
@@ -109,6 +120,7 @@ fun MainScreen(
     val exerciseDetailScrollMap by viewModel.exerciseDetailScrollMap.collectAsState()
     val tagsWithCounts by viewModel.tagsWithCounts.collectAsState()
 
+    val snackbarHostState = remember { SnackbarHostState() }
     var destinationStack by remember { mutableStateOf(listOf<ScreenDestination>(ScreenDestination.Tab(0))) }
     var isNavigatingBack by remember { mutableStateOf(false) }
     val currentDestination = destinationStack.last()
@@ -122,16 +134,19 @@ fun MainScreen(
     }
 
     fun navigateTo(dest: ScreenDestination) {
+        snackbarHostState.currentSnackbarData?.dismiss()
         isNavigatingBack = false
         destinationStack = destinationStack + dest
     }
 
     fun replaceTop(dest: ScreenDestination) {
+        snackbarHostState.currentSnackbarData?.dismiss()
         isNavigatingBack = false
         destinationStack = destinationStack.dropLast(1) + dest
     }
 
     fun navigateBack() {
+        snackbarHostState.currentSnackbarData?.dismiss()
         if (destinationStack.size > 1) {
             isNavigatingBack = true
             destinationStack = destinationStack.dropLast(1)
@@ -142,6 +157,7 @@ fun MainScreen(
 
     // 硬件返回键处理
     BackHandler(enabled = destinationStack.size > 1) {
+        snackbarHostState.currentSnackbarData?.dismiss()
         if (destinationStack.lastOrNull() is ScreenDestination.Search) {
             viewModel.clearSearch()
         }
@@ -153,6 +169,46 @@ fun MainScreen(
     Scaffold(
         modifier = modifier.fillMaxSize(),
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = {
+            SnackbarHost(
+                hostState = snackbarHostState,
+                modifier = Modifier.padding(bottom = 12.dp)
+            ) { data ->
+                val actionTextColor = MaterialTheme.colorScheme.inversePrimary
+                Snackbar(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    action = data.visuals.actionLabel?.let { actionLabel ->
+                        {
+                            TextButton(
+                                onClick = { data.performAction() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = actionTextColor),
+                            ) {
+                                Text(
+                                    text = actionLabel,
+                                    color = actionTextColor,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                    dismissAction = {
+                        IconButton(
+                            onClick = { data.dismiss() },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "关闭",
+                                tint = MaterialTheme.colorScheme.inverseOnSurface,
+                            )
+                        }
+                    },
+                ) {
+                    Text(data.visuals.message)
+                }
+            }
+        },
         bottomBar = {
             if (showBottomBar) {
                 NavigationBar(
@@ -163,6 +219,7 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = currentTab == 0,
                         onClick = {
+                            snackbarHostState.currentSnackbarData?.dismiss()
                             if (currentTab == 0 && (activePianSlug != null || currentDestination is ScreenDestination.ChapterDetail)) {
                                 // 在阅读页再次点击阅读 Tab：重置回篇目总览网格（完全对齐 Flutter _openCatalogPage）
                                 viewModel.setActivePianSlug(null)
@@ -187,6 +244,7 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = currentTab == 1,
                         onClick = {
+                            snackbarHostState.currentSnackbarData?.dismiss()
                             isNavigatingBack = false
                             destinationStack = listOf(ScreenDestination.Tab(1))
                         },
@@ -207,6 +265,7 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = currentTab == 2,
                         onClick = {
+                            snackbarHostState.currentSnackbarData?.dismiss()
                             if (currentTab == 2 && favoritesTagId != null) {
                                 viewModel.setFavoritesTagId(null)
                             }
@@ -226,6 +285,7 @@ fun MainScreen(
                     NavigationBarItem(
                         selected = currentTab == 3,
                         onClick = {
+                            snackbarHostState.currentSnackbarData?.dismiss()
                             isNavigatingBack = false
                             destinationStack = listOf(ScreenDestination.Tab(3))
                         },
@@ -350,6 +410,8 @@ fun MainScreen(
                         when (dest.index) {
                             0 -> ReadingScreen(
                                 library = library,
+                                hasActiveEdition = contentSnapshot.activeEdition != null,
+                                onOpenResourceManagement = { navigateTo(ScreenDestination.ResourceManagement) },
                                 activePianSlug = activePianSlug,
                                 onActivePianChanged = { viewModel.setActivePianSlug(it) },
                                 favoriteChapterIds = favoriteChapters,
@@ -553,6 +615,23 @@ fun MainScreen(
                                         if (target != null) {
                                             viewModel.setActivePianSlug(target.first.slug)
                                             navigateTo(ScreenDestination.ChapterDetail(target.first.slug, target.second.number))
+                                        } else {
+                                            val hasActiveEdition = viewModel.contentSnapshot.value.activeEdition != null
+                                            val message = if (!hasActiveEdition) {
+                                                "未装载并启用任何译注版本"
+                                            } else {
+                                                "当前译注未包含该章节"
+                                            }
+                                            snackbarHostState.currentSnackbarData?.dismiss()
+                                            val result = snackbarHostState.showSnackbar(
+                                                message = message,
+                                                actionLabel = "资源管理",
+                                                duration = SnackbarDuration.Short
+                                            )
+                                            if (result == SnackbarResult.ActionPerformed) {
+                                                snackbarHostState.currentSnackbarData?.dismiss()
+                                                navigateTo(ScreenDestination.ResourceManagement)
+                                            }
                                         }
                                     }
                                 },
@@ -623,12 +702,11 @@ fun MainScreen(
                         )
                     }
                     ScreenDestination.ResourceManagement -> {
-                        val snapshot by viewModel.contentSnapshot.collectAsState()
                         val installedResources by viewModel.installedResources.collectAsState()
                         val registry by viewModel.resourceRegistry.collectAsState()
                         val operationState by viewModel.resourceOperationState.collectAsState()
                         ResourceManagementScreen(
-                            snapshot = snapshot,
+                            snapshot = contentSnapshot,
                             installedResources = installedResources,
                             registry = registry,
                             operationState = operationState,

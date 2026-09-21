@@ -56,6 +56,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material3.Button
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ilunyu.lunyu.data.model.AnalectsLibrary
@@ -66,6 +72,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun ReadingScreen(
     library: AnalectsLibrary?,
+    hasActiveEdition: Boolean = true,
+    onOpenResourceManagement: () -> Unit = {},
     activePianSlug: String?,
     onActivePianChanged: (String?) -> Unit,
     favoriteChapterIds: Set<String>,
@@ -79,7 +87,80 @@ fun ReadingScreen(
     onNavigateToSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (library == null || library.pians.isEmpty()) {
+    if (!hasActiveEdition || (library != null && library.pians.isEmpty())) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.surface)
+                .statusBarsPadding()
+        ) {
+            LunyuTopBar(
+                title = {
+                    Text(
+                        text = "论语",
+                        style = MaterialTheme.typography.titleLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 22.sp
+                        )
+                    )
+                },
+                showDivider = false,
+                actions = {
+                    IconButton(onClick = onNavigateToSearch) {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = "搜索")
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                }
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Outlined.MenuBook,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                    )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text(
+                        text = "未装载并启用任何译注版本",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "当前未装载并启用任何译注版本\n请前往“资源管理”页面进行设置",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Button(
+                        onClick = onOpenResourceManagement,
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "前往资源管理",
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Medium)
+                        )
+                    }
+                }
+            }
+        }
+        return
+    }
+
+    if (library == null) {
         Box(modifier = modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
         }
