@@ -35,6 +35,7 @@ import androidx.compose.runtime.derivedStateOf
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTabLayout
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
+import com.ilunyu.lunyu.ui.common.SectionCountBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -245,32 +246,25 @@ fun ReadingScreen(
                         state = lazyListState,
                         modifier = Modifier.fillMaxSize()
                     ) {
-                        item {
-                            Column(
-                                modifier = Modifier.padding(
-                                    start = 24.dp,
-                                    end = 24.dp,
-                                    top = 20.dp,
-                                    bottom = 20.dp
-                                )
-                            ) {
+                        item(key = "count_header") {
+                            SectionCountBar(
+                                countText = "共 ${currentPian.chapters.size} 章"
+                            )
+                        }
+                        if (currentPian.comment.isNotBlank()) {
+                            item(key = "pian_comment") {
                                 Text(
-                                    text = "共 ${currentPian.chapters.size} 章",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = currentPian.comment,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        lineHeight = 20.sp
+                                    ),
+                                    modifier = Modifier.padding(
+                                        start = 24.dp,
+                                        end = 24.dp,
+                                        bottom = 16.dp
                                     )
                                 )
-                                if (currentPian.comment.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = currentPian.comment,
-                                        style = MaterialTheme.typography.bodySmall.copy(
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            lineHeight = 20.sp
-                                        )
-                                    )
-                                }
                             }
                         }
 

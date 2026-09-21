@@ -20,6 +20,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.graphics.Color
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
+import com.ilunyu.lunyu.ui.common.SectionCountBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -154,13 +155,8 @@ fun StudyScreen(
                 ) {
                     // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
                     item(key = "count_header") {
-                        Text(
-                            text = countText,
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            ),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 0.dp)
+                        SectionCountBar(
+                            countText = countText
                         )
                     }
 
@@ -174,7 +170,7 @@ fun StudyScreen(
                             onChipClick = { dimension ->
                                 activeFilterDimension = dimension
                             },
-                            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                            modifier = Modifier.padding(top = 0.dp, bottom = 10.dp)
                         )
                     }
 

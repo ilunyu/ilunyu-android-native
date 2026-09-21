@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Search
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTabLayout
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
+import com.ilunyu.lunyu.ui.common.SectionCountBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.LaunchedEffect
@@ -617,26 +618,16 @@ fun FavoritesScreen(
                             state = chapterListState,
                             modifier = Modifier.fillMaxSize()
                         ) {
-                            item {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "共 ${displayedChapters.size} 章",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            item(key = "count_header") {
+                                SectionCountBar(
+                                    countText = "共 ${displayedChapters.size} 章",
+                                    action = {
+                                        FavoritesSortAction(
+                                            sortMode = sortMode,
+                                            onToggleSortMode = toggleSortMode
                                         )
-                                    )
-                                    FavoritesSortAction(
-                                        sortMode = sortMode,
-                                        onToggleSortMode = toggleSortMode
-                                    )
-                                }
+                                    }
+                                )
                             }
 
                             itemsIndexed(
@@ -676,25 +667,15 @@ fun FavoritesScreen(
                         ) {
                             // 1. 统计数据行与排序操作（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
                             item(key = "count_header") {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 0.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = countText,
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                SectionCountBar(
+                                    countText = countText,
+                                    action = {
+                                        FavoritesSortAction(
+                                            sortMode = sortMode,
+                                            onToggleSortMode = toggleSortMode
                                         )
-                                    )
-                                    FavoritesSortAction(
-                                        sortMode = sortMode,
-                                        onToggleSortMode = toggleSortMode
-                                    )
-                                }
+                                    }
+                                )
                             }
 
                             // 2. 筛选器行：挪到“共 xx 题”下方，依次为学年、地区、年级、类别
@@ -707,7 +688,7 @@ fun FavoritesScreen(
                                     onChipClick = { dimension ->
                                         activeFilterDimension = dimension
                                     },
-                                    modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                                    modifier = Modifier.padding(top = 0.dp, bottom = 10.dp)
                                 )
                             }
 

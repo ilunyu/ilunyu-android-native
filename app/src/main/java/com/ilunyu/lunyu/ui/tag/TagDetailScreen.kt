@@ -1,6 +1,7 @@
 package com.ilunyu.lunyu.ui.tag
 
 import com.ilunyu.lunyu.data.repository.TAG_PRESET_COLORS
+import com.ilunyu.lunyu.ui.common.SectionCountBar
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -304,13 +305,8 @@ fun TagDetailScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item(key = "chapter_count") {
-                                Text(
-                                    text = "共 ${matchingChapters.size} 章",
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                SectionCountBar(
+                                    countText = "共 ${matchingChapters.size} 章"
                                 )
                             }
 
@@ -352,13 +348,8 @@ fun TagDetailScreen(
                             modifier = Modifier.fillMaxSize()
                         ) {
                             item(key = "exercise_count") {
-                                Text(
-                                    text = countText,
-                                    style = MaterialTheme.typography.titleSmall.copy(
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    ),
-                                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 0.dp)
+                                SectionCountBar(
+                                    countText = countText
                                 )
                             }
 
@@ -371,7 +362,7 @@ fun TagDetailScreen(
                                     onChipClick = { dimension ->
                                         activeFilterDimension = dimension
                                     },
-                                    modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                                    modifier = Modifier.padding(top = 0.dp, bottom = 10.dp)
                                 )
                             }
 

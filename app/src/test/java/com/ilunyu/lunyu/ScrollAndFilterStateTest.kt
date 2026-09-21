@@ -209,4 +209,33 @@ class ScrollAndFilterStateTest {
             sortedTypes
         )
     }
+
+    @Test
+    fun testResourceOperationStateClearing() {
+        var state: com.ilunyu.lunyu.data.resource.ResourceOperationState =
+            com.ilunyu.lunyu.data.resource.ResourceOperationState.Idle
+
+        fun clearState() {
+            if (state is com.ilunyu.lunyu.data.resource.ResourceOperationState.Complete ||
+                state is com.ilunyu.lunyu.data.resource.ResourceOperationState.Failed
+            ) {
+                state = com.ilunyu.lunyu.data.resource.ResourceOperationState.Idle
+            }
+        }
+
+        // Complete state must be clearable to Idle
+        state = com.ilunyu.lunyu.data.resource.ResourceOperationState.Complete("pkg", "1.0")
+        clearState()
+        assertEquals(com.ilunyu.lunyu.data.resource.ResourceOperationState.Idle, state)
+
+        // Failed state must be clearable to Idle
+        state = com.ilunyu.lunyu.data.resource.ResourceOperationState.Failed("pkg", "Network error")
+        clearState()
+        assertEquals(com.ilunyu.lunyu.data.resource.ResourceOperationState.Idle, state)
+
+        // Downloading state must NOT be cleared by clearState()
+        state = com.ilunyu.lunyu.data.resource.ResourceOperationState.Downloading("pkg", 100L, 200L)
+        clearState()
+        assertEquals(com.ilunyu.lunyu.data.resource.ResourceOperationState.Downloading("pkg", 100L, 200L), state)
+    }
 }

@@ -31,6 +31,12 @@ class ResourceManager(
     private val _registry = MutableStateFlow<ResourceRegistry?>(null)
     val registry: StateFlow<ResourceRegistry?> = _registry.asStateFlow()
 
+    fun clearOperationState() {
+        if (_operationState.value is ResourceOperationState.Complete || _operationState.value is ResourceOperationState.Failed) {
+            _operationState.value = ResourceOperationState.Idle
+        }
+    }
+
     suspend fun refreshRegistry(registryUrl: String): Result<ResourceRegistry> = withContext(Dispatchers.IO) {
         runCatching {
             downloads.mkdirs()
@@ -65,6 +71,7 @@ class ResourceManager(
         item: ResourceRegistryPackage,
     ): Result<ResourceManifest> = withContext(Dispatchers.IO) {
         runCatching {
+            _operationState.value = ResourceOperationState.Downloading(item.packageId, 0L, null)
             downloads.mkdirs()
             val partial = File(downloads, "${safeName(item.packageId)}-${item.versionCode}.part")
             val failures = mutableListOf<String>()
@@ -92,6 +99,7 @@ class ResourceManager(
 
     suspend fun downloadAndInstallFromUrl(rawUrl: String): Result<ResourceManifest> = withContext(Dispatchers.IO) {
         runCatching {
+            _operationState.value = ResourceOperationState.Downloading("URL 资源", 0L, null)
             val target = resolveResourceUrl(rawUrl)
             downloads.mkdirs()
             val partial = File(downloads, "url-${UUID.randomUUID()}.part")
@@ -117,6 +125,7 @@ class ResourceManager(
                     require(packageRoot.deleteRecursively()) { "资源文件删除失败" }
                 }
                 resourceRepository.removeDownloadedPackage(resource.packageId)
+                _operationState.value = ResourceOperationState.Idle
             }.onFailure { error ->
                 _operationState.value = ResourceOperationState.Failed(resource.packageId, error.message ?: "资源删除失败")
             }

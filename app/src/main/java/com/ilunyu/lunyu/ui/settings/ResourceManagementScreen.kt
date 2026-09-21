@@ -65,6 +65,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -100,6 +101,7 @@ fun ResourceManagementScreen(
     installedResources: List<InstalledResourceEntity>,
     registry: ResourceRegistry?,
     operationState: ResourceOperationState,
+    onClearOperationState: () -> Unit = {},
     onAddUrl: (String) -> Unit,
     onRefresh: suspend () -> Result<ResourceRegistry>,
     onDownload: (String) -> Unit,
@@ -113,7 +115,7 @@ fun ResourceManagementScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     var isCheckingUpdates by remember { mutableStateOf(false) }
-    var isAddingFromUrl by rememberSaveable { mutableStateOf(false) }
+    var isAddingFromUrl by remember { mutableStateOf(false) }
     val isAddLoading = isAddingFromUrl || (operationState is ResourceOperationState.Downloading && operationState.packageId == "URL 资源") || (isAddingFromUrl && operationState is ResourceOperationState.Installing)
     var showAddDialog by rememberSaveable { mutableStateOf(false) }
     var resourceUrl by rememberSaveable { mutableStateOf("") }
@@ -136,28 +138,43 @@ fun ResourceManagementScreen(
         }
     }
 
-    // 监听资源操作结果（成功或失败通过 Snackbar 进行报告）
+    // 页面离开时，确保已结束的操作状态被清除，防止重新进入时重复弹出 Snackbar
+    DisposableEffect(Unit) {
+        onDispose {
+            onClearOperationState()
+        }
+    }
+
+    // 监听资源操作结果（成功或失败通过 Snackbar 进行报告，消费后立即重置为 Idle）
     LaunchedEffect(operationState) {
-        when (operationState) {
+        when (val state = operationState) {
             is ResourceOperationState.Complete -> {
                 isAddingFromUrl = false
-                val pkgName = installedResources.find { it.packageId == operationState.packageId }?.name
-                    ?: registry?.packages?.find { it.packageId == operationState.packageId }?.name
-                    ?: operationState.packageId
-                snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar(
-                    message = "$pkgName ${operationState.versionName} 已成功安装",
-                    withDismissAction = true,
-                )
+                val pkgName = installedResources.find { it.packageId == state.packageId }?.name
+                    ?: registry?.packages?.find { it.packageId == state.packageId }?.name
+                    ?: state.packageId
+                val message = "$pkgName ${state.versionName} 已成功安装"
+                onClearOperationState()
+                scope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        withDismissAction = true,
+                    )
+                }
             }
             is ResourceOperationState.Failed -> {
                 isAddingFromUrl = false
-                val errorMsg = operationState.message.takeIf { it.isNotBlank() } ?: "操作失败"
-                snackbarHostState.currentSnackbarData?.dismiss()
-                snackbarHostState.showSnackbar(
-                    message = "资源获取失败：$errorMsg",
-                    withDismissAction = true,
-                )
+                val errorMsg = state.message.takeIf { it.isNotBlank() } ?: "操作失败"
+                val message = "资源获取失败：$errorMsg"
+                onClearOperationState()
+                scope.launch {
+                    snackbarHostState.currentSnackbarData?.dismiss()
+                    snackbarHostState.showSnackbar(
+                        message = message,
+                        withDismissAction = true,
+                    )
+                }
             }
             else -> {}
         }

@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material3.ExperimentalMaterial3Api
+import com.ilunyu.lunyu.ui.common.SectionCountBar
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -310,14 +311,9 @@ fun SearchScreen(
                                 state = chapterListState,
                                 modifier = Modifier.fillMaxSize()
                             ) {
-                                item {
-                                    Text(
-                                        text = "共 ${matchingChapters.size} 章",
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                                item(key = "chapter_count") {
+                                    SectionCountBar(
+                                        countText = "共 ${matchingChapters.size} 章"
                                     )
                                 }
 
@@ -357,13 +353,8 @@ fun SearchScreen(
                             ) {
                                 // 1. 统计数据行（未筛选为“共 xx 题”，筛选后为“筛选出 xx 题·共 xx 题”）
                                 item(key = "count_header") {
-                                    Text(
-                                        text = countText,
-                                        style = MaterialTheme.typography.titleSmall.copy(
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 0.dp)
+                                    SectionCountBar(
+                                        countText = countText
                                     )
                                 }
 
@@ -377,7 +368,7 @@ fun SearchScreen(
                                         onChipClick = { dimension ->
                                             activeFilterDimension = dimension
                                         },
-                                        modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)
+                                        modifier = Modifier.padding(top = 0.dp, bottom = 10.dp)
                                     )
                                 }
 

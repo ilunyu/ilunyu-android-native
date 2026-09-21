@@ -235,6 +235,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch { resourceManager.deleteDownloadedResource(resource) }
     }
 
+    fun clearResourceOperationState() {
+        resourceManager.clearOperationState()
+    }
+
     fun setDefaultAnswerExpanded(expanded: Boolean) {
         viewModelScope.launch {
             userPrefs.setDefaultAnswerExpanded(expanded)

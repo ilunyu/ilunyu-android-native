@@ -632,6 +632,7 @@ fun MainScreen(
                             installedResources = installedResources,
                             registry = registry,
                             operationState = operationState,
+                            onClearOperationState = { viewModel.clearResourceOperationState() },
                             onAddUrl = { viewModel.addResourceFromUrl(it) },
                             onRefresh = { viewModel.refreshResourceRegistry() },
                             onDownload = { viewModel.downloadResource(it) },
