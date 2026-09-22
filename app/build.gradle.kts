@@ -20,9 +20,31 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    val releaseKeystorePath = providers.environmentVariable("ILUNYU_KEYSTORE_PATH").orNull
+    val releaseKeystorePassword = providers.environmentVariable("ILUNYU_KEYSTORE_PASSWORD").orNull
+    val releaseKeyAlias = providers.environmentVariable("ILUNYU_KEY_ALIAS").orNull
+    val releaseKeyPassword = providers.environmentVariable("ILUNYU_KEY_PASSWORD").orNull
+
+    signingConfigs {
+        if (
+            releaseKeystorePath != null &&
+            releaseKeystorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
