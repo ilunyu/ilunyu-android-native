@@ -648,18 +648,18 @@ fun ResourceManagementScreen(
         if (showAddDialog) {
             AlertDialog(
                 onDismissRequest = { showAddDialog = false },
-                title = { Text("从 URL 添加资源") },
+                title = { Text("添加 GitHub 资源仓库") },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "粘贴 GitHub 仓库、Release 页面或 .ilunyupack 直链。",
+                            "粘贴 GitHub 仓库地址，例如 https://github.com/ilunyu/ilunyu-exercise-2021-2022。末尾 .git 会自动转换。",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         OutlinedTextField(
                             value = resourceUrl,
                             onValueChange = { resourceUrl = it },
-                            label = { Text("资源 URL") },
+                            label = { Text("GitHub 仓库 URL") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                         )

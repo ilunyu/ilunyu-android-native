@@ -53,7 +53,15 @@ data class ResourceRegistryPackage(
 
 @Serializable
 internal data class ResourceReleaseMetadata(
+    val packageId: String = "",
+    val kind: String = "",
+    val name: String = "",
+    val versionName: String = "",
+    val versionCode: Int = 0,
+    val minAppVersionCode: Int = 0,
+    val size: Long = 0,
     val sha256: String = "",
+    val sourceRepository: String = "",
 )
 
 @Serializable

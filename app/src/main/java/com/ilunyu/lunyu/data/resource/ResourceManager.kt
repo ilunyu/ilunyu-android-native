@@ -39,15 +39,36 @@ class ResourceManager(
 
     suspend fun refreshRegistry(registryUrl: String): Result<ResourceRegistry> = withContext(Dispatchers.IO) {
         runCatching {
-            downloads.mkdirs()
-            val cache = File(root, "registry.json")
-            val etagFile = File(root, "registry.etag")
-            val connection = (URL(registryUrl).openConnection() as HttpURLConnection).apply {
-                connectTimeout = CONNECT_TIMEOUT_MS
-                readTimeout = READ_TIMEOUT_MS
-                requestMethod = "GET"
-                if (etagFile.isFile) setRequestProperty("If-None-Match", etagFile.readText())
+            val registryResult = runCatching { readOfficialRegistry(registryUrl) }
+            val repositoryPackages = resourceRepository.installedResources.value
+                .asSequence()
+                .filter { it.locationType == ResourceLocationType.DOWNLOADED }
+                .mapNotNull { installed -> runCatching { latestRepositoryPackage(installed.originUrl) }.getOrNull() }
+                .toList()
+            val registry = registryResult.getOrNull()
+                ?: ResourceRegistry(REGISTRY_SCHEMA_VERSION, "", emptyList())
+            require(registryResult.isSuccess || repositoryPackages.isNotEmpty()) {
+                registryResult.exceptionOrNull()?.message ?: "未找到可检查更新的资源"
             }
+            registry.copy(
+                packages = (registry.packages + repositoryPackages)
+                    .groupBy { it.packageId }
+                    .map { (_, packages) -> packages.maxBy { it.versionCode } },
+            ).also { _registry.value = it }
+        }
+    }
+
+    private fun readOfficialRegistry(registryUrl: String): ResourceRegistry {
+        downloads.mkdirs()
+        val cache = File(root, "registry.json")
+        val etagFile = File(root, "registry.etag")
+        val connection = (URL(registryUrl).openConnection() as HttpURLConnection).apply {
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            requestMethod = "GET"
+            if (etagFile.isFile) setRequestProperty("If-None-Match", etagFile.readText())
+        }
+        return try {
             connection.connect()
             val content = when (connection.responseCode) {
                 HttpURLConnection.HTTP_NOT_MODIFIED -> {
@@ -60,10 +81,9 @@ class ResourceManager(
                 }
                 else -> error("资源注册表请求失败：HTTP ${connection.responseCode}")
             }
+            json.decodeFromString<ResourceRegistry>(content).also(::validateRegistry)
+        } finally {
             connection.disconnect()
-            val registry = json.decodeFromString<ResourceRegistry>(content)
-            validateRegistry(registry)
-            registry.also { _registry.value = it }
         }
     }
 
@@ -100,7 +120,8 @@ class ResourceManager(
     suspend fun downloadAndInstallFromUrl(rawUrl: String): Result<ResourceManifest> = withContext(Dispatchers.IO) {
         runCatching {
             _operationState.value = ResourceOperationState.Downloading("URL 资源", 0L, null)
-            val target = resolveResourceUrl(rawUrl)
+            val repositoryUrl = normalizeGithubRepositoryUrl(rawUrl)
+            val target = resolveGithubRepository(repositoryUrl)
             downloads.mkdirs()
             val partial = File(downloads, "url-${UUID.randomUUID()}.part")
             download(target.downloadUrl, partial, "URL 资源")
@@ -200,37 +221,18 @@ class ResourceManager(
         }
     }
 
-    private fun resolveResourceUrl(rawUrl: String): ResolvedDownload {
-        val url = rawUrl.trim()
-        require(url.startsWith("https://")) { "请输入 HTTPS 资源链接" }
-        val githubRelease = GITHUB_RELEASE_URL.matchEntire(url)
-        if (githubRelease != null) {
-            return resolveGithubRelease(githubRelease.groupValues[1], githubRelease.groupValues[2], githubRelease.groupValues[3], url)
-        }
-        val githubLatestRelease = GITHUB_LATEST_RELEASE_URL.matchEntire(url)
-        if (githubLatestRelease != null) {
-            return resolveGithubReleaseApi(
-                "https://api.github.com/repos/${githubLatestRelease.groupValues[1]}/${githubLatestRelease.groupValues[2]}/releases/latest",
-                url,
-            )
-        }
-        val githubRepository = GITHUB_REPOSITORY_URL.matchEntire(url)
-        if (githubRepository != null) {
-            val owner = githubRepository.groupValues[1]
-            val repository = githubRepository.groupValues[2]
-            return resolveGithubReleaseApi(
-                "https://api.github.com/repos/$owner/$repository/releases/latest",
-                url,
-            )
-        }
-        return ResolvedDownload(downloadUrl = url, expectedSha256 = null, originUrl = url)
+    private fun normalizeGithubRepositoryUrl(rawUrl: String): String {
+        val match = GITHUB_REPOSITORY_URL.matchEntire(rawUrl.trim())
+            ?: error("请输入 GitHub 仓库地址，例如 https://github.com/ilunyu/ilunyu-exercise-2021-2022")
+        return "https://github.com/${match.groupValues[1]}/${match.groupValues[2].removeSuffix(".git")}"
     }
 
-    private fun resolveGithubRelease(owner: String, repository: String, tag: String, originUrl: String): ResolvedDownload {
-        val encodedTag = URLEncoder.encode(tag, Charsets.UTF_8.name())
+    private fun resolveGithubRepository(repositoryUrl: String): ResolvedDownload {
+        val match = GITHUB_REPOSITORY_URL.matchEntire(repositoryUrl)
+            ?: error("GitHub 仓库地址不合法")
         return resolveGithubReleaseApi(
-            "https://api.github.com/repos/$owner/$repository/releases/tags/$encodedTag",
-            originUrl,
+            "https://api.github.com/repos/${match.groupValues[1]}/${match.groupValues[2]}/releases/latest",
+            repositoryUrl,
         )
     }
 
@@ -239,7 +241,8 @@ class ResourceManager(
         val archive = release.assets.firstOrNull { it.name == "resource.ilunyupack" }
             ?: release.assets.firstOrNull { it.name.endsWith(".ilunyupack") }
             ?: error("该 GitHub Release 未提供 .ilunyupack 资源包")
-        val metadata = release.assets.firstOrNull { it.name == "release.json" }?.let { asset ->
+        val metadataAsset = release.assets.firstOrNull { it.name == "release.json" }
+        val metadata = metadataAsset?.let { asset ->
             runCatching {
                 json.decodeFromString<ResourceReleaseMetadata>(readText(asset.downloadUrl))
             }.getOrNull()
@@ -248,6 +251,29 @@ class ResourceManager(
             downloadUrl = archive.downloadUrl,
             expectedSha256 = metadata?.sha256?.takeIf { it.length == SHA256_HEX_LENGTH },
             originUrl = originUrl,
+            metadataUrl = metadataAsset?.downloadUrl,
+        )
+    }
+
+    private fun latestRepositoryPackage(originUrl: String): ResourceRegistryPackage? {
+        if (originUrl.isBlank()) return null
+        val repositoryUrl = normalizeGithubRepositoryUrl(originUrl)
+        val download = resolveGithubRepository(repositoryUrl)
+        val metadataUrl = download.metadataUrl ?: return null
+        val metadata = json.decodeFromString<ResourceReleaseMetadata>(readText(metadataUrl))
+        if (metadata.packageId.isBlank() || metadata.versionCode <= 0 || metadata.sha256.length != SHA256_HEX_LENGTH) return null
+        return ResourceRegistryPackage(
+            packageId = metadata.packageId,
+            kind = metadata.kind,
+            name = metadata.name,
+            versionName = metadata.versionName,
+            versionCode = metadata.versionCode,
+            minAppVersionCode = metadata.minAppVersionCode,
+            size = metadata.size,
+            sha256 = metadata.sha256,
+            sourceRepository = repositoryUrl,
+            releasePageUrl = repositoryUrl,
+            downloadUrls = listOf(download.downloadUrl),
         )
     }
 
@@ -374,9 +400,7 @@ class ResourceManager(
         const val REGISTRY_SCHEMA_VERSION = 1
         const val SHA256_HEX_LENGTH = 64
         val PACKAGE_ID = Regex("^[a-z][a-z0-9._-]{2,127}$")
-        val GITHUB_RELEASE_URL = Regex("https://github\\.com/([^/]+)/([^/]+)/releases/tag/([^/?#]+)/*(?:[?#].*)?")
-        val GITHUB_LATEST_RELEASE_URL = Regex("https://github\\.com/([^/]+)/([^/]+)/releases(?:/latest)?/*(?:[?#].*)?")
-        val GITHUB_REPOSITORY_URL = Regex("https://github\\.com/([^/]+)/([^/?#]+)/?(?:[?#].*)?")
+        val GITHUB_REPOSITORY_URL = Regex("https://github\\.com/([^/]+)/([^/?#]+?)(?:\\.git)?/?(?:[?#].*)?")
     }
 }
 
@@ -384,4 +408,5 @@ private data class ResolvedDownload(
     val downloadUrl: String,
     val expectedSha256: String?,
     val originUrl: String,
+    val metadataUrl: String? = null,
 )
