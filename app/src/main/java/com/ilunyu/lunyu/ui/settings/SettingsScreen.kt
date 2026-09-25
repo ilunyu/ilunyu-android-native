@@ -342,8 +342,21 @@ fun SettingsScreen(
                         )
                     )
                     Spacer(modifier = Modifier.height(4.dp))
+                    val appVersionName = remember(context) {
+                        runCatching {
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                                context.packageManager.getPackageInfo(
+                                    context.packageName,
+                                    android.content.pm.PackageManager.PackageInfoFlags.of(0)
+                                ).versionName
+                            } else {
+                                @Suppress("DEPRECATION")
+                                context.packageManager.getPackageInfo(context.packageName, 0).versionName
+                            }
+                        }.getOrNull() ?: "1.0.2"
+                    }
                     Text(
-                        text = "版本 1.0.0",
+                        text = "版本 $appVersionName",
                         style = MaterialTheme.typography.bodySmall.copy(
                             fontWeight = FontWeight.Normal,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
