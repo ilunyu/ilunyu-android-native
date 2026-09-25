@@ -152,6 +152,28 @@ class ResourceManager(
             }
         }
 
+    suspend fun cleanupObsoletePackageDirectories() = withContext(Dispatchers.IO) {
+        runCatching {
+            val installedPaths = resourceRepository.installedResources.value
+                .filter { it.locationType == ResourceLocationType.DOWNLOADED }
+                .map { File(it.rootPath).canonicalPath }
+                .toSet()
+            val packageRoots = packages.listFiles() ?: return@runCatching
+            for (pkgRoot in packageRoots) {
+                if (!pkgRoot.isDirectory) continue
+                val versionDirs = pkgRoot.listFiles() ?: continue
+                for (versionDir in versionDirs) {
+                    if (versionDir.isDirectory && versionDir.canonicalPath !in installedPaths) {
+                        versionDir.deleteRecursively()
+                    }
+                }
+                if (pkgRoot.listFiles()?.isEmpty() == true) {
+                    pkgRoot.delete()
+                }
+            }
+        }
+    }
+
     private fun download(urlString: String, partial: File, packageId: String) {
         var connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
             connectTimeout = CONNECT_TIMEOUT_MS
@@ -202,14 +224,20 @@ class ResourceManager(
             unpackArchive(archive, targetStaging)
             val manifest = readAndValidateManifest(targetStaging)
             _operationState.value = ResourceOperationState.Installing(manifest.packageId)
-            val target = File(File(packages, safeName(manifest.packageId)), manifest.versionCode.toString())
-            target.parentFile?.mkdirs()
+            val packageRoot = File(packages, safeName(manifest.packageId))
+            val target = File(packageRoot, manifest.versionCode.toString())
+            packageRoot.mkdirs()
             val packageDirectory = if (target.exists()) {
                 targetStaging.deleteRecursively()
                 target
             } else {
                 check(targetStaging.renameTo(target)) { "资源包安装目录切换失败" }
                 target
+            }
+            packageRoot.listFiles()?.forEach { file ->
+                if (file.isDirectory && file.name != manifest.versionCode.toString()) {
+                    file.deleteRecursively()
+                }
             }
             resourceRepository.registerDownloadedPackage(manifest, packageDirectory, archiveSha256, originUrl)
             archive.delete()

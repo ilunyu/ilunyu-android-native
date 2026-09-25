@@ -192,21 +192,58 @@ fun ResourceManagementScreen(
         }
     }
 
-    val installedEditions = remember(installedResources) {
-        installedResources.filter { it.kind == ResourceKind.EDITION }
+    val installedEditions = remember(installedResources, snapshot.activeEdition) {
+        installedResources
+            .filter { it.kind == ResourceKind.EDITION }
+            .groupBy { it.packageId }
+            .map { (packageId, versions) ->
+                val active = snapshot.activeEdition?.takeIf { it.packageId == packageId }
+                if (active != null) {
+                    versions.firstOrNull { it.versionCode == active.versionCode && it.locationType == active.locationType }
+                        ?: versions.first()
+                } else {
+                    versions.maxWithOrNull(
+                        compareBy<InstalledResourceEntity> { it.locationType == ResourceLocationType.DOWNLOADED }
+                            .thenBy { it.versionCode }
+                    ) ?: versions.first()
+                }
+            }
+            .sortedWith(
+                compareBy<InstalledResourceEntity> { it.locationType != ResourceLocationType.BUNDLED }
+                    .thenBy { it.packageId }
+            )
     }
-    val uninstalledEditions = remember(registry, installedResources) {
+    val uninstalledEditions = remember(registry, installedEditions) {
         registry?.packages?.filter { pkg ->
-            pkg.kind == ResourceKind.EDITION && installedResources.none { it.packageId == pkg.packageId }
+            pkg.kind == ResourceKind.EDITION && installedEditions.none { it.packageId == pkg.packageId }
         } ?: emptyList()
     }
 
-    val installedExercises = remember(installedResources) {
-        installedResources.filter { it.kind == ResourceKind.EXERCISE }
+    val installedExercises = remember(installedResources, snapshot.allExercisePackages) {
+        val activeExerciseMap = snapshot.allExercisePackages.associateBy { it.packageId }
+        installedResources
+            .filter { it.kind == ResourceKind.EXERCISE }
+            .groupBy { it.packageId }
+            .map { (packageId, versions) ->
+                val active = activeExerciseMap[packageId]
+                if (active != null) {
+                    versions.firstOrNull { it.versionCode == active.versionCode && it.locationType == active.locationType }
+                        ?: versions.first()
+                } else {
+                    versions.maxWithOrNull(
+                        compareBy<InstalledResourceEntity> { it.locationType == ResourceLocationType.DOWNLOADED }
+                            .thenBy { it.versionCode }
+                    ) ?: versions.first()
+                }
+            }
+            .sortedWith(
+                compareBy<InstalledResourceEntity> { it.locationType != ResourceLocationType.BUNDLED }
+                    .thenBy { it.packageId }
+            )
     }
-    val uninstalledExercises = remember(registry, installedResources) {
+    val uninstalledExercises = remember(registry, installedExercises) {
         registry?.packages?.filter { pkg ->
-            pkg.kind == ResourceKind.EXERCISE && installedResources.none { it.packageId == pkg.packageId }
+            pkg.kind == ResourceKind.EXERCISE && installedExercises.none { it.packageId == pkg.packageId }
         } ?: emptyList()
     }
 
@@ -353,10 +390,10 @@ fun ResourceManagementScreen(
                 // 已安装译注列表
                 items(
                     count = installedEditions.size,
-                    key = { index -> "edition-${installedEditions[index].packageId}-${installedEditions[index].versionCode}-${installedEditions[index].locationType}" },
+                    key = { index -> "edition-${installedEditions[index].packageId}" },
                 ) { index ->
                     val item = installedEditions[index]
-                    val itemKey = "edition-${item.packageId}-${item.versionCode}-${item.locationType}"
+                    val itemKey = "edition-${item.packageId}"
                     val activeEdition = snapshot.activeEdition
                     val isActive = activeEdition != null &&
                         item.packageId == activeEdition.packageId &&
@@ -365,7 +402,7 @@ fun ResourceManagementScreen(
                     val remoteUpdate = registry?.packages?.find {
                         it.packageId == item.packageId && it.versionCode > item.versionCode
                     }
-                    val isLatestInstalled = installedEditions
+                    val isLatestInstalled = installedResources
                         .filter { it.packageId == item.packageId }
                         .maxOfOrNull { it.versionCode } == item.versionCode
 
@@ -516,17 +553,17 @@ fun ResourceManagementScreen(
                 // 已安装试题库列表
                 items(
                     count = installedExercises.size,
-                    key = { index -> "exercise-${installedExercises[index].packageId}-${installedExercises[index].versionCode}-${installedExercises[index].locationType}" },
+                    key = { index -> "exercise-${installedExercises[index].packageId}" },
                 ) { index ->
                     val item = installedExercises[index]
-                    val itemKey = "exercise-${item.packageId}-${item.versionCode}-${item.locationType}"
+                    val itemKey = "exercise-${item.packageId}"
                     val enabled = snapshot.enabledExercisePackages.any { resource ->
-                        resource.packageId == item.packageId && resource.versionCode == item.versionCode
+                        resource.packageId == item.packageId
                     }
                     val remoteUpdate = registry?.packages?.find {
                         it.packageId == item.packageId && it.versionCode > item.versionCode
                     }
-                    val isLatestInstalled = installedExercises
+                    val isLatestInstalled = installedResources
                         .filter { it.packageId == item.packageId }
                         .maxOfOrNull { it.versionCode } == item.versionCode
 

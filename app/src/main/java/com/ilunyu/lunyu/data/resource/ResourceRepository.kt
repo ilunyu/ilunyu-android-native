@@ -106,6 +106,30 @@ class ResourceRepository(
                     activeEditionPackageId = bundledEdition.packageId.takeIf { hasBundledEdition }.orEmpty(),
                 ),
             )
+            cleanupObsoleteDownloadedResources()
+        }
+    }
+
+    suspend fun cleanupObsoleteDownloadedResources() {
+        val downloaded = resourceDao.getDownloadedResources()
+        val activations = resourceDao.getActivations().associateBy { it.packageId }
+        val grouped = downloaded.groupBy { it.packageId }
+        for ((packageId, list) in grouped) {
+            if (list.size > 1) {
+                val active = activations[packageId]
+                val keep = list.find { it.versionCode == active?.activeVersionCode }
+                    ?: list.maxByOrNull { it.versionCode }
+                    ?: continue
+                for (item in list) {
+                    if (item.versionCode != keep.versionCode) {
+                        resourceDao.deleteDownloadedResourceVersion(packageId, item.versionCode)
+                        val dir = File(item.rootPath)
+                        if (dir.exists()) {
+                            dir.deleteRecursively()
+                        }
+                    }
+                }
+            }
         }
     }
 

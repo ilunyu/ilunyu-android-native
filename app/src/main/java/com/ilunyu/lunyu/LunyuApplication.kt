@@ -44,6 +44,8 @@ class LunyuApplication : Application() {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             tagRepository.migrateLegacyExerciseIds()
             userPreferencesRepository.migrateLegacyExerciseIds()
+            resourceRepository.cleanupObsoleteDownloadedResources()
+            resourceManager.cleanupObsoletePackageDirectories()
         }
     }
 }

@@ -5,6 +5,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
+import com.ilunyu.lunyu.data.resource.ResourceKind
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -48,6 +49,24 @@ interface ResourceDao {
     @Query("DELETE FROM installed_resources WHERE package_id = :packageId")
     suspend fun deleteResources(packageId: String)
 
+    @Query("DELETE FROM installed_resources WHERE package_id = :packageId AND location_type = 'DOWNLOADED' AND version_code != :currentVersionCode")
+    suspend fun deleteOtherDownloadedResources(packageId: String, currentVersionCode: Int)
+
+    @Query("SELECT * FROM installed_resources WHERE package_id = :packageId AND location_type = 'BUNDLED' LIMIT 1")
+    suspend fun getBundledResource(packageId: String): InstalledResourceEntity?
+
+    @Query("DELETE FROM installed_resources WHERE package_id = :packageId AND location_type = 'DOWNLOADED'")
+    suspend fun deleteDownloadedResources(packageId: String)
+
+    @Query("SELECT * FROM installed_resources WHERE location_type = 'DOWNLOADED'")
+    suspend fun getDownloadedResources(): List<InstalledResourceEntity>
+
+    @Query("SELECT * FROM resource_activations")
+    suspend fun getActivations(): List<ResourceActivationEntity>
+
+    @Query("DELETE FROM installed_resources WHERE package_id = :packageId AND version_code = :versionCode AND location_type = 'DOWNLOADED'")
+    suspend fun deleteDownloadedResourceVersion(packageId: String, versionCode: Int)
+
     @Query("DELETE FROM resource_activations WHERE package_id = :packageId")
     suspend fun deleteActivation(packageId: String)
 
@@ -62,8 +81,12 @@ interface ResourceDao {
         resource: InstalledResourceEntity,
         activation: ResourceActivationEntity,
     ) {
+        deleteOtherDownloadedResources(resource.packageId, resource.versionCode)
         upsertResource(resource)
         upsertActivation(activation)
+        if (resource.kind == ResourceKind.EDITION) {
+            selectEdition(resource.packageId)
+        }
         advanceGeneration()
     }
 
@@ -97,10 +120,22 @@ interface ResourceDao {
 
     @Transaction
     suspend fun removeDownloadedPackage(packageId: String) {
-        clearChapterExerciseReferences(packageId)
-        deleteActivation(packageId)
-        deleteResources(packageId)
-        clearActiveEditionIfSelected(packageId)
+        deleteDownloadedResources(packageId)
+        val bundled = getBundledResource(packageId)
+        if (bundled != null) {
+            upsertActivation(
+                ResourceActivationEntity(
+                    packageId = packageId,
+                    activeVersionCode = bundled.versionCode,
+                    activeLocationType = bundled.locationType,
+                    enabled = true,
+                )
+            )
+        } else {
+            clearChapterExerciseReferences(packageId)
+            deleteActivation(packageId)
+            clearActiveEditionIfSelected(packageId)
+        }
         advanceGeneration()
     }
 }
