@@ -276,7 +276,6 @@ fun SettingsScreen(
                     checked = defaultAnswerExpanded,
                     onCheckedChange = onDefaultAnswerExpandedChanged
                 )
-                Spacer(modifier = Modifier.height(8.dp))
             }
 
             // 全宽分割线
@@ -295,7 +294,7 @@ fun SettingsScreen(
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     ),
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 20.dp)
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp)
                 )
             }
 
@@ -353,7 +352,7 @@ fun SettingsScreen(
                                 @Suppress("DEPRECATION")
                                 context.packageManager.getPackageInfo(context.packageName, 0).versionName
                             }
-                        }.getOrNull() ?: "1.0.2"
+                        }.getOrNull() ?: "1.0.3"
                     }
                     Text(
                         text = "版本 $appVersionName",
@@ -518,7 +517,7 @@ private fun SettingListItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -536,10 +535,10 @@ private fun SettingListItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -567,7 +566,7 @@ private fun SettingSwitchItem(
         modifier = modifier
             .fillMaxWidth()
             .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 24.dp, vertical = 12.dp),
+            .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Icon(
@@ -585,10 +584,10 @@ private fun SettingSwitchItem(
                     color = MaterialTheme.colorScheme.onSurface
                 )
             )
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = subtitle,
-                style = MaterialTheme.typography.bodyMedium.copy(
+                style = MaterialTheme.typography.bodySmall.copy(
                     fontWeight = FontWeight.Normal,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -303,17 +303,12 @@ fun ResourceManagementScreen(
                                         )
                                     } else {
                                         val newUpdates = checkUpdates(result.getOrNull(), installedResources)
-                                        val updateMsg = when {
-                                            newUpdates.isEmpty() -> "所有资源均为最新版"
-                                            newUpdates.size == 1 -> {
-                                                val name = if (newUpdates[0].name.endsWith("资源库")) newUpdates[0].name else "${newUpdates[0].name}资源库"
-                                                "${name}有更新"
-                                            }
-                                            else -> {
-                                                val name = if (newUpdates[0].name.endsWith("资源库")) newUpdates[0].name else "${newUpdates[0].name}资源库"
-                                                "${name}等 ${newUpdates.size} 个资源库有更新"
-                                            }
-                                        }
+                                        val uninstalled = checkUninstalled(result.getOrNull(), installedResources)
+                                        val updateMsg = buildResourceCheckMessage(
+                                            newUpdates = newUpdates,
+                                            uninstalled = uninstalled,
+                                            hasInstalledResources = installedResources.isNotEmpty(),
+                                        )
                                         snackbarHostState.currentSnackbarData?.dismiss()
                                         snackbarHostState.showSnackbar(
                                             message = updateMsg,
@@ -382,7 +377,7 @@ fun ResourceManagementScreen(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 12.dp),
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 24.dp),
                         )
                     }
                 }
@@ -405,6 +400,8 @@ fun ResourceManagementScreen(
                     val isLatestInstalled = installedResources
                         .filter { it.packageId == item.packageId }
                         .maxOfOrNull { it.versionCode } == item.versionCode
+                    val isItemOperating = (operationState is ResourceOperationState.Downloading && operationState.packageId == item.packageId) ||
+                        (operationState is ResourceOperationState.Installing && operationState.packageId == item.packageId)
 
                     val subtitle = buildString {
                         append(item.versionName)
@@ -470,16 +467,26 @@ fun ResourceManagementScreen(
                         } else null,
                         trailingAction = if (remoteUpdate != null && isLatestInstalled) {
                             {
-                                OutlinedButton(
-                                    onClick = { onDownload(remoteUpdate.packageId) },
-                                    modifier = Modifier.height(32.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                ) {
-                                    Text("更新", fontSize = 12.sp)
-                                }
-                                Spacer(Modifier.width(4.dp))
+                                ResourceActionButton(
+                                    packageId = remoteUpdate.packageId,
+                                    operationState = operationState,
+                                    expectedSizeBytes = remoteUpdate.size,
+                                    buttonText = "更新",
+                                    onAction = { onDownload(remoteUpdate.packageId) },
+                                )
+                            }
+                        } else if (isItemOperating) {
+                            {
+                                ResourceActionButton(
+                                    packageId = item.packageId,
+                                    operationState = operationState,
+                                    expectedSizeBytes = remoteUpdate?.size,
+                                    buttonText = "更新",
+                                    onAction = {},
+                                )
                             }
                         } else null,
+                        isOperating = isItemOperating,
                     )
                 }
 
@@ -490,6 +497,8 @@ fun ResourceManagementScreen(
                 ) { index ->
                     val item = uninstalledEditions[index]
                     val itemKey = "remote-edition-${item.packageId}"
+                    val isItemOperating = (operationState is ResourceOperationState.Downloading && operationState.packageId == item.packageId) ||
+                        (operationState is ResourceOperationState.Installing && operationState.packageId == item.packageId)
                     val githubUrl = item.sourceRepository.ifBlank {
                         item.releasePageUrl.ifBlank { "https://github.com/ilunyu" }
                     }
@@ -511,26 +520,24 @@ fun ResourceManagementScreen(
                             // 允许点击，不改变状态
                         },
                         trailingAction = {
-                            OutlinedButton(
-                                onClick = { onDownload(item.packageId) },
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            ) {
-                                Text("下载", fontSize = 12.sp)
-                            }
-                            Spacer(Modifier.width(4.dp))
+                            ResourceActionButton(
+                                packageId = item.packageId,
+                                operationState = operationState,
+                                expectedSizeBytes = item.size,
+                                buttonText = "下载",
+                                onAction = { onDownload(item.packageId) },
+                            )
                         },
+                        isOperating = isItemOperating,
                     )
                 }
 
                 // 2. 试题库与译注版本之间的全宽分割线
                 item {
-                    Spacer(Modifier.height(12.dp))
                     HorizontalDivider(
-                        modifier = Modifier.fillMaxWidth(),
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        thickness = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
                     )
-                    Spacer(Modifier.height(4.dp))
                 }
 
                 // 3. 试题库小标题
@@ -545,7 +552,7 @@ fun ResourceManagementScreen(
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             ),
-                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 6.dp, bottom = 12.dp),
+                            modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 24.dp),
                         )
                     }
                 }
@@ -566,6 +573,8 @@ fun ResourceManagementScreen(
                     val isLatestInstalled = installedResources
                         .filter { it.packageId == item.packageId }
                         .maxOfOrNull { it.versionCode } == item.versionCode
+                    val isItemOperating = (operationState is ResourceOperationState.Downloading && operationState.packageId == item.packageId) ||
+                        (operationState is ResourceOperationState.Installing && operationState.packageId == item.packageId)
 
                     val subtitle = buildString {
                         append(item.versionName)
@@ -622,16 +631,26 @@ fun ResourceManagementScreen(
                         } else null,
                         trailingAction = if (remoteUpdate != null && isLatestInstalled) {
                             {
-                                OutlinedButton(
-                                    onClick = { onDownload(remoteUpdate.packageId) },
-                                    modifier = Modifier.height(32.dp),
-                                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                                ) {
-                                    Text("更新", fontSize = 12.sp)
-                                }
-                                Spacer(Modifier.width(4.dp))
+                                ResourceActionButton(
+                                    packageId = remoteUpdate.packageId,
+                                    operationState = operationState,
+                                    expectedSizeBytes = remoteUpdate.size,
+                                    buttonText = "更新",
+                                    onAction = { onDownload(remoteUpdate.packageId) },
+                                )
+                            }
+                        } else if (isItemOperating) {
+                            {
+                                ResourceActionButton(
+                                    packageId = item.packageId,
+                                    operationState = operationState,
+                                    expectedSizeBytes = remoteUpdate?.size,
+                                    buttonText = "更新",
+                                    onAction = {},
+                                )
                             }
                         } else null,
+                        isOperating = isItemOperating,
                     )
                 }
 
@@ -642,6 +661,8 @@ fun ResourceManagementScreen(
                 ) { index ->
                     val item = uninstalledExercises[index]
                     val itemKey = "remote-exercise-${item.packageId}"
+                    val isItemOperating = (operationState is ResourceOperationState.Downloading && operationState.packageId == item.packageId) ||
+                        (operationState is ResourceOperationState.Installing && operationState.packageId == item.packageId)
                     val githubUrl = item.sourceRepository.ifBlank {
                         item.releasePageUrl.ifBlank { "https://github.com/ilunyu" }
                     }
@@ -663,15 +684,15 @@ fun ResourceManagementScreen(
                             // 允许点击，不改变状态
                         },
                         trailingAction = {
-                            OutlinedButton(
-                                onClick = { onDownload(item.packageId) },
-                                modifier = Modifier.height(32.dp),
-                                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
-                            ) {
-                                Text("下载", fontSize = 12.sp)
-                            }
-                            Spacer(Modifier.width(4.dp))
+                            ResourceActionButton(
+                                packageId = item.packageId,
+                                operationState = operationState,
+                                expectedSizeBytes = item.size,
+                                buttonText = "下载",
+                                onAction = { onDownload(item.packageId) },
+                            )
                         },
+                        isOperating = isItemOperating,
                     )
                 }
 
@@ -780,7 +801,7 @@ private fun ResourceSectionHeader(title: String) {
             fontWeight = FontWeight.Normal,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         ),
-        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 8.dp),
+        modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 20.dp, bottom = 12.dp),
     )
 }
 
@@ -810,7 +831,6 @@ private fun ResourceDeleteConfirmDialog(
         title = {
             Text(
                 text = "删除资源",
-                fontWeight = FontWeight.Bold,
             )
         },
         text = {
@@ -844,6 +864,60 @@ private fun ResourceDeleteConfirmDialog(
     )
 }
 
+@Composable
+private fun ResourceActionButton(
+    packageId: String,
+    operationState: ResourceOperationState,
+    expectedSizeBytes: Long? = null,
+    buttonText: String,
+    onAction: () -> Unit,
+) {
+    val isOperating = (operationState is ResourceOperationState.Downloading && operationState.packageId == packageId) ||
+        (operationState is ResourceOperationState.Installing && operationState.packageId == packageId)
+
+    if (isOperating) {
+        val progress: Float? = if (operationState is ResourceOperationState.Downloading) {
+            val total = operationState.totalBytes ?: expectedSizeBytes?.takeIf { it > 0 }
+            if (total != null && total > 0) {
+                (operationState.receivedBytes.toFloat() / total).coerceIn(0f, 1f)
+            } else null
+        } else null
+
+        Box(
+            modifier = Modifier
+                .height(32.dp)
+                .width(48.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (progress != null) {
+                CircularProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    strokeWidth = 2.5.dp,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+        Spacer(Modifier.width(4.dp))
+    } else {
+        OutlinedButton(
+            onClick = onAction,
+            modifier = Modifier.height(32.dp),
+            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 0.dp),
+        ) {
+            Text(buttonText, fontSize = 12.sp)
+        }
+        Spacer(Modifier.width(4.dp))
+    }
+}
+
 /**
  * 带有 Swipe to reveal 功能的列表项组件：
  * - 纯 Icon、间距为 8 的 Narrow 胶囊按钮，高度为全高（与行高度一致）
@@ -866,6 +940,7 @@ private fun SwipeableResourceRow(
     trailingAction: @Composable (() -> Unit)? = null,
     enableActionIcon: ImageVector? = null,
     onDelete: (() -> Unit)? = null,
+    isOperating: Boolean = false,
     modifier: Modifier = Modifier,
 ) {
     val isRevealed = (revealedItemKey == itemKey)
@@ -986,18 +1061,26 @@ private fun SwipeableResourceRow(
                         .fillMaxHeight()
                         .clip(RoundedCornerShape(percent = 50))
                         .background(actionBg)
-                        .clickable {
+                        .clickable(enabled = !isOperating) {
                             onToggleEnabled()
                             onRevealedKeyChange(null)
                         },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Icon(
-                        imageVector = actionIcon,
-                        contentDescription = actionDesc,
-                        tint = actionColor,
-                        modifier = Modifier.size(20.dp),
-                    )
+                    if (isOperating) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(18.dp),
+                            strokeWidth = 2.dp,
+                            color = actionColor,
+                        )
+                    } else {
+                        Icon(
+                            imageVector = actionIcon,
+                            contentDescription = actionDesc,
+                            tint = actionColor,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
                 }
 
                 // 按钮 4: 删除按钮（深浅红色反置，使用 error 实心红底与 onError 亮色图标，更具警示性）
@@ -1060,7 +1143,7 @@ private fun SwipeableResourceRow(
                         onClick()
                     }
                 }
-                .padding(start = 24.dp, top = 14.dp, end = 12.dp, bottom = 14.dp),
+                .padding(start = 24.dp, top = 16.dp, end = 12.dp, bottom = 16.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Icon(
@@ -1079,11 +1162,11 @@ private fun SwipeableResourceRow(
                         color = MaterialTheme.colorScheme.onSurface,
                     ),
                 )
-                Spacer(modifier = Modifier.height(2.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodyMedium.copy(
-                        fontSize = 14.sp,
+                    style = MaterialTheme.typography.bodySmall.copy(
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
@@ -1166,7 +1249,16 @@ private fun getRemoteResourceDownloadUrl(
     return "https://github.com/ilunyu"
 }
 
-private fun checkUpdates(
+internal fun formatPackageDisplayName(pkg: ResourceRegistryPackage): String {
+    val name = pkg.name
+    return if (name.endsWith("库") || name.endsWith("》") || name.endsWith("译注") || name.endsWith("试题") || name.endsWith("资源库")) {
+        name
+    } else {
+        "${name}资源库"
+    }
+}
+
+internal fun checkUpdates(
     registry: ResourceRegistry?,
     installedResources: List<InstalledResourceEntity>,
 ): List<ResourceRegistryPackage> {
@@ -1176,6 +1268,65 @@ private fun checkUpdates(
             .filter { it.packageId == regPkg.packageId }
             .maxOfOrNull { it.versionCode }
         currentMax != null && regPkg.versionCode > currentMax
+    }
+}
+
+internal fun checkUninstalled(
+    registry: ResourceRegistry?,
+    installedResources: List<InstalledResourceEntity>,
+): List<ResourceRegistryPackage> {
+    if (registry == null) return emptyList()
+    return registry.packages.filter { regPkg ->
+        installedResources.none { it.packageId == regPkg.packageId }
+    }
+}
+
+internal fun buildResourceCheckMessage(
+    newUpdates: List<ResourceRegistryPackage>,
+    uninstalled: List<ResourceRegistryPackage>,
+    hasInstalledResources: Boolean,
+): String {
+    return when {
+        newUpdates.isNotEmpty() && uninstalled.isNotEmpty() -> {
+            val updateName = formatPackageDisplayName(newUpdates[0])
+            val updatePrefix = if (newUpdates.size == 1) {
+                "${updateName}有更新"
+            } else {
+                "${updateName}等 ${newUpdates.size} 个资源有更新"
+            }
+            val uninstalledSuffix = if (uninstalled.size == 1) {
+                val uninstalledName = formatPackageDisplayName(uninstalled[0])
+                "另有 ${uninstalledName} 未安装"
+            } else {
+                "另有 ${uninstalled.size} 个资源未安装"
+            }
+            "${updatePrefix}，${uninstalledSuffix}"
+        }
+        newUpdates.isNotEmpty() -> {
+            val name = formatPackageDisplayName(newUpdates[0])
+            if (newUpdates.size == 1) {
+                "${name}有更新"
+            } else {
+                "${name}等 ${newUpdates.size} 个资源有更新"
+            }
+        }
+        uninstalled.isNotEmpty() -> {
+            val name = formatPackageDisplayName(uninstalled[0])
+            if (!hasInstalledResources) {
+                if (uninstalled.size == 1) {
+                    "${name}未安装，可下载"
+                } else {
+                    "${name}等 ${uninstalled.size} 个资源未安装，可下载"
+                }
+            } else {
+                if (uninstalled.size == 1) {
+                    "已安装资源均为最新版，另有 ${name} 未安装"
+                } else {
+                    "已安装资源均为最新版，另有 ${uninstalled.size} 个资源未安装"
+                }
+            }
+        }
+        else -> "所有资源均为最新版"
     }
 }
 

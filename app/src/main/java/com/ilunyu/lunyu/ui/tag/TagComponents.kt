@@ -121,6 +121,7 @@ fun TagChip(
     name: String,
     colorHex: String? = null,
     icon: String? = null,
+    containerColor: Color = Color.Transparent,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null
 ) {
@@ -162,7 +163,7 @@ fun TagChip(
             } else null,
             shape = RoundedCornerShape(8.dp),
             colors = FilterChipDefaults.filterChipColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = containerColor,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 iconColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
@@ -211,7 +212,7 @@ fun AddTagChip(
             },
             shape = RoundedCornerShape(8.dp),
             colors = FilterChipDefaults.filterChipColors(
-                containerColor = MaterialTheme.colorScheme.surface,
+                containerColor = Color.Transparent,
                 labelColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 iconColor = MaterialTheme.colorScheme.onSurfaceVariant
             ),
@@ -227,120 +228,6 @@ fun AddTagChip(
     }
 }
 
-/**
- * 点击已有标签 Chip 弹出的操作选项对话框：
- * 允许用户直接查看该标签关联内容，或从当前章节中解除关联
- */
-@Composable
-fun TagActionDialog(
-    tagName: String,
-    colorHex: String? = null,
-    icon: String? = null,
-    onNavigateToTag: () -> Unit,
-    onRemoveFromItem: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    val cleanName = tagName.trim().removePrefix("#").trim()
-    val iconVector = getTagImageVector(icon)
-    val hasColor = !colorHex.isNullOrBlank()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        shape = RoundedCornerShape(16.dp),
-        title = {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (iconVector != null) {
-                    Icon(
-                        imageVector = iconVector,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(20.dp)
-                    )
-                } else if (hasColor) {
-                    Box(
-                        modifier = Modifier
-                            .size(16.dp)
-                            .background(color = parseTagColor(colorHex), shape = CircleShape)
-                    )
-                }
-                Text(
-                    text = cleanName,
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
-                )
-            }
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                TextButton(
-                    onClick = {
-                        onDismiss()
-                        onNavigateToTag()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = ButtonDefaults.TextButtonContentPadding
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.QuestionAnswer,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "查看该标签下的所有内容",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                        )
-                    }
-                }
-                TextButton(
-                    onClick = {
-                        onDismiss()
-                        onRemoveFromItem()
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    contentPadding = ButtonDefaults.TextButtonContentPadding
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Text(
-                            text = "从本章移除此标签",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
-}
 
 /**
  * 为章节或试题打标签的 BottomSheet
@@ -567,7 +454,7 @@ fun TagSelectionBottomSheet(
 
 /**
  * 标签编辑/重命名对话框：
- * - 样式完全对齐 AddTagDialog（20dp 圆角 Surface 容器、12dp OutlinedTextField、前置图标、实时字数计数与校验、4 种图标 + 9 种颜色横向滚动单选）
+ * - 样式完全对齐 AddTagDialog（28dp 圆角 Surface 容器、12dp OutlinedTextField、前置图标、实时字数计数与校验、4 种图标 + 9 种颜色横向滚动单选）
  * - 智能防重名校验（排除自身当前名称，允许保留原名；改名且与其他已有标签重名时拦截）
  * - 支持同时编辑/切换图标与颜色（互斥单选）
  */
@@ -597,7 +484,7 @@ fun TagEditDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
             modifier = Modifier
@@ -613,74 +500,74 @@ fun TagEditDialog(
                 // 标题
                 Text(
                     text = title,
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    ),
+                    style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
 
-                // 1. TextField
-                OutlinedTextField(
-                    value = tagName,
-                    onValueChange = { input ->
-                        if (input.length <= 8) {
-                            tagName = input
-                        }
-                    },
+                // 提示语与输入框：对齐“添加 GitHub 资源仓库”对话框结构，间距 8dp，bodyMedium 字体
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
-                    label = { Text("标签名称") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.Edit,
-                            contentDescription = null
-                        )
-                    },
-                    supportingText = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            if (isReserved) {
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "标签名称不超过 8 个字符，且不得与已有标签重复。您可以为标签选择您喜欢的图标或代表色。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    OutlinedTextField(
+                        value = tagName,
+                        onValueChange = { input ->
+                            tagName = input
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                        label = { Text("标签名称") },
+                        supportingText = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                if (isTooLong) {
+                                    Text(
+                                        text = "标签名称不能超过 8 个字",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else if (isReserved) {
+                                    Text(
+                                        text = "不能使用系统预留名称“$trimmed”",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else if (isDuplicate) {
+                                    Text(
+                                        text = "已存在同名标签",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                                 Text(
-                                    text = "不能使用系统预留名称“$trimmed”",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            } else if (isDuplicate) {
-                                Text(
-                                    text = "已存在同名标签",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            } else {
-                                Text(
-                                    text = "不超过 8 字，不得与其他标签重复",
+                                    text = "${trimmed.length}/8",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "${trimmed.length}/8",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    isError = isDuplicate || isTooLong || isReserved,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        isError = isDuplicate || isTooLong || isReserved,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                        )
                     )
-                )
+                }
 
                 // 2. 选择图标或颜色行
                 Row(
@@ -812,7 +699,6 @@ fun TagDeleteConfirmDialog(
         title = {
             Text(
                 text = "删除标签",
-                fontWeight = FontWeight.Bold
             )
         },
         text = {
@@ -889,7 +775,7 @@ fun AddTagDialog(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Surface(
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(28.dp),
             color = MaterialTheme.colorScheme.surfaceContainerHigh,
             tonalElevation = 6.dp,
             modifier = Modifier
@@ -905,74 +791,74 @@ fun AddTagDialog(
                 // 标题
                 Text(
                     text = "添加标签",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 20.sp
-                    ),
+                    style = MaterialTheme.typography.headlineSmall,
                     modifier = Modifier.padding(horizontal = 24.dp)
                 )
 
-                // 1. TextField（MD3 Outlined 样式，灰色 Leading Icon，Primary 主题色聚焦）
-                OutlinedTextField(
-                    value = tagName,
-                    onValueChange = { input ->
-                        if (input.length <= 8) {
-                            tagName = input
-                        }
-                    },
+                // 提示语与输入框：对齐“添加 GitHub 资源仓库”对话框结构，间距 8dp，bodyMedium 字体
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 24.dp),
-                    singleLine = true,
-                    textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
-                    label = { Text("标签名称") },
-                    leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Outlined.NewLabel,
-                            contentDescription = null
-                        )
-                    },
-                    supportingText = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            if (isReserved) {
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = "标签名称不超过 8 个字符，且不得与已有标签重复。您可以为标签选择您喜欢的图标或代表色。",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    OutlinedTextField(
+                        value = tagName,
+                        onValueChange = { input ->
+                            tagName = input
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true,
+                        textStyle = LocalTextStyle.current.copy(fontSize = 16.sp),
+                        label = { Text("标签名称") },
+                        supportingText = {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                if (isTooLong) {
+                                    Text(
+                                        text = "标签名称不能超过 8 个字",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else if (isReserved) {
+                                    Text(
+                                        text = "不能使用系统预留名称“$trimmed”",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else if (isDuplicate) {
+                                    Text(
+                                        text = if (isAlreadyAttached) "本章已添加该标签" else "已存在该标签，可点下方建议添加",
+                                        color = MaterialTheme.colorScheme.error,
+                                        style = MaterialTheme.typography.bodySmall
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                                 Text(
-                                    text = "不能使用系统预留名称“$trimmed”",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            } else if (isDuplicate) {
-                                Text(
-                                    text = if (isAlreadyAttached) "本章已添加该标签" else "已存在该标签，可点下方建议添加",
-                                    color = MaterialTheme.colorScheme.error,
-                                    style = MaterialTheme.typography.bodySmall
-                                )
-                            } else {
-                                Text(
-                                    text = "不超过 8 字，不得与已有标签重复",
+                                    text = "${trimmed.length}/8",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
-                            Text(
-                                text = "${trimmed.length}/8",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isTooLong) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                    },
-                    isError = isDuplicate || isTooLong || isReserved,
-                    shape = RoundedCornerShape(12.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                        focusedLabelColor = MaterialTheme.colorScheme.primary,
-                        cursorColor = MaterialTheme.colorScheme.primary,
-                        focusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        unfocusedLeadingIconColor = MaterialTheme.colorScheme.onSurfaceVariant
+                        },
+                        isError = isDuplicate || isTooLong || isReserved,
+                        shape = RoundedCornerShape(12.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                            focusedLabelColor = MaterialTheme.colorScheme.primary,
+                            cursorColor = MaterialTheme.colorScheme.primary,
+                        )
                     )
-                )
+                }
 
                 // 2. 建议 Chips 行（仅当用户输入内容之后且有匹配建议时出现；滑动边缘贴齐 dialog 边缘，滑动边界与 24dp 内容对齐）
                 if (suggestionTags.isNotEmpty()) {
@@ -989,6 +875,7 @@ fun AddTagDialog(
                                 name = tag.name,
                                 colorHex = tag.colorHex,
                                 icon = tag.icon,
+                                containerColor = Color.Transparent,
                                 onClick = {
                                     onSelectExistingTag(tag)
                                     onDismissRequest()

@@ -3,7 +3,6 @@ package com.ilunyu.lunyu.ui.reading
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
-import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
@@ -33,6 +32,7 @@ import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.outlined.BookmarkBorder
 import androidx.compose.material.icons.outlined.CalendarMonth
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Quiz
 import com.ilunyu.lunyu.data.model.Exercise
@@ -49,6 +49,7 @@ import kotlin.math.roundToInt
 import com.ilunyu.lunyu.ui.common.LunyuCollapsibleTopBarLayout
 import com.ilunyu.lunyu.ui.common.LunyuTopBar
 import com.ilunyu.lunyu.ui.common.rememberLunyuTopBarScrollState
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,8 +57,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Snackbar
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -105,10 +111,12 @@ fun ChapterScreen(
     onNavigateToChapter: (String, Int) -> Unit,
     onNavigateToExercise: (String) -> Unit = {},
     onBack: () -> Unit,
+    onShowSnackbar: ((String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val localSnackbarHostState = remember { SnackbarHostState() }
     val exerciseMap = remember(exercises) { exercises.associateBy { it.id } }
 
     var showAddTagDialog by remember { mutableStateOf(false) }
@@ -190,7 +198,17 @@ fun ChapterScreen(
                             val clip = ClipData.newPlainText("Chapter Text", chapter.plainText)
                             clipboard.setPrimaryClip(clip)
                             isCopied = true
-                            Toast.makeText(context, "已复制原文", Toast.LENGTH_SHORT).show()
+                            if (onShowSnackbar != null) {
+                                onShowSnackbar("已复制原文")
+                            } else {
+                                coroutineScope.launch {
+                                    localSnackbarHostState.currentSnackbarData?.dismiss()
+                                    localSnackbarHostState.showSnackbar(
+                                        message = "已复制原文",
+                                        duration = SnackbarDuration.Short,
+                                    )
+                                }
+                            }
                         }
                     ) {
                         Icon(
@@ -680,6 +698,49 @@ fun ChapterScreen(
                 },
                 onDismissRequest = { showAddTagDialog = false }
             )
+        }
+
+        if (onShowSnackbar == null) {
+            SnackbarHost(
+                hostState = localSnackbarHostState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 12.dp),
+            ) { data ->
+                val actionTextColor = MaterialTheme.colorScheme.inversePrimary
+                Snackbar(
+                    modifier = Modifier.padding(horizontal = 16.dp),
+                    action = data.visuals.actionLabel?.let { actionLabel ->
+                        {
+                            TextButton(
+                                onClick = { data.performAction() },
+                                colors = ButtonDefaults.textButtonColors(contentColor = actionTextColor),
+                            ) {
+                                Text(
+                                    text = actionLabel,
+                                    color = actionTextColor,
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.Bold,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                    dismissAction = {
+                        IconButton(
+                            onClick = { data.dismiss() },
+                        ) {
+                            Icon(
+                                imageVector = Icons.Outlined.Close,
+                                contentDescription = "关闭",
+                                tint = MaterialTheme.colorScheme.inverseOnSurface,
+                            )
+                        }
+                    },
+                ) {
+                    Text(data.visuals.message)
+                }
+            }
         }
     }
 }

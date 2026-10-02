@@ -570,6 +570,15 @@ fun MainScreen(
                                 },
                                 onBack = {
                                     navigateBack()
+                                },
+                                onShowSnackbar = { message ->
+                                    coroutineScope.launch {
+                                        snackbarHostState.currentSnackbarData?.dismiss()
+                                        snackbarHostState.showSnackbar(
+                                            message = message,
+                                            duration = SnackbarDuration.Short,
+                                        )
+                                    }
                                 }
                             )
                         } else {

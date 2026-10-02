@@ -16,14 +16,14 @@ import kotlinx.coroutines.withContext
  */
 val TAG_PRESET_COLORS = listOf(
     "#008080", // 黛绿 (Teal)
-    "#2F72B5", // 苍蓝 (Slate Blue)
-    "#C04851", // 绯红 (Carmine)
-    "#D98719", // 琥珀 (Amber)
-    "#2E7D32", // 竹青 (Bamboo Green)
-    "#7E57C2", // 暮紫 (Twilight Purple)
-    "#A0522D", // 赭石 (Ochre)
-    "#00897B", // 松石 (Turquoise)
-    "#546E7A"  // 墨灰 (Slate Grey)
+    "#5976BA", // 景泰蓝 R89, G118, B186
+    "#C03F2E", // 石榴裙 R192, G63, B46
+    "#FAC03D", // 栀子 R250, G192, B61
+    "#83AD28", // 柳绿 R131, G173, B40
+    "#BA79B1", // 木槿 R186, G121, B177
+    "#BD8253", // 露褐 R189, G130, B83
+    "#D4DDE1", // 荻色 R212, G221, B225
+    "#91828F"  // 黪紫 R145, G130, B143
 )
 
 class TagRepository(private val tagDao: TagDao) {
